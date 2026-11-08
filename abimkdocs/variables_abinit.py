@@ -19823,6 +19823,30 @@ fixes the initial guess for the Fermi energy.
 ),
 
 Variable(
+    abivarname="rdmft_selfint",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: treatment of the SELF-INTeraction (diagonal) term",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Governs the diagonal (same-orbital) term of the energy in the Piris natural orbital functionals (PNOF) used with
+[[optdriver]] = 11 (RDMFT). The Coulomb integral $J_{pp}$ and the exchange integral $K_{pp}$ of an orbital with itself
+are equal for isolated systems, and the PNOF diagonal term $n_p J_{pp}$ is then free of self-interaction.
+In a periodic calculation $K_{pp}$ differs from $J_{pp}$ by a finite-size term due to the treatment of the
+$\mathbf{q}+\mathbf{G}=0$ divergence of the exchange (see [[fock_icutcoul]]), and the PNOF energy then does not reduce
+to the Hartree-Fock energy for integer occupations.
+
+  * 0 --> the PNOF diagonal term is $n_p J_{pp}$ (self-interaction free, as in the molecular case).
+  * 1 --> the term $n_p^2 (J_{pp}-K_{pp})$ is added for each pair: the PNOF energies reduce to the Hartree-Fock energy for
+    integer occupations. The correction vanishes when the supercell size (N_k times the cell volume) goes to infinity.
+""",
+),
+
+Variable(
     abivarname="recgratio",
     varset="dev",
     vartype="integer",

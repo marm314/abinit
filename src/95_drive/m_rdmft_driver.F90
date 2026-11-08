@@ -202,7 +202,8 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  end do
  write(msg,'(2a,es14.6,a)') ch10,' RDMFT: sum over occupied orbitals of (K_pp - J_pp) / N_k^2 = ',eexch/orbs%nkpt**2,' Ha'
  call wrtout([ab_out,std_out],msg)
- write(msg,'(2a)') ch10,' RDMFT: functionals evaluated with the ground-state occupations (total energy, difference with SD):'
+ write(msg,'(2a,i0,a)') ch10,' RDMFT: functionals evaluated with the ground-state occupations (rdmft_selfint = ',&
+   dtset%rdmft_selfint,'; total energy, difference with SD):'
  call wrtout([ab_out,std_out],msg)
  do ifunc=RDMFT_SD,RDMFT_MULLER_AS
    eone = rdmft_energy_jk(ifunc,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint,.not.occd,0.6_dp)+e_ewald+e_corepsp
@@ -214,7 +215,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    if (ierr2 /= 0) cycle
    do ifunc=RDMFT_PNOF5,RDMFT_GNOF
      if (ifunc > RDMFT_PNOF5+3) cycle
-     eone = rdmft_energy_pnof(ifunc,table,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint)+e_ewald+e_corepsp
+     eone = rdmft_energy_pnof(ifunc,table,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint,dtset%rdmft_selfint)+e_ewald+e_corepsp
      write(msg,'(2a,2(a,i0),a,es22.14,a,es10.2)') '   ',rdmft_functional_name(ifunc),' (nsub=',pnof_sub(ipair),&
        ', coupling=',pnof_cpl(ipair),')',eone,'  diff =',eone-etot
      call wrtout([ab_out,std_out],msg)

@@ -283,6 +283,7 @@ ABI_TOPICS = [
     "PseudosPAW",
     "q-points",
     "RandStopPow",
+    "RDMFT",
     "Recursion",
     "RPACorrEn",
     "RTTDDFT",

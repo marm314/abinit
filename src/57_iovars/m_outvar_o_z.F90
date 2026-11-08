@@ -874,6 +874,9 @@ contains
  dprarr(3,:)=dtsets(:)%red_efieldbar(3)
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,3,narrm,ncid,ndtset_alloc,'red_efieldbar','DPR',0)
 
+ intarr(1,:)=dtsets(:)%rdmft_selfint
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_selfint','INT',0)
+
  intarr(1,:)=dtsets(:)%restartxf
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'restartxf','INT',0)
 

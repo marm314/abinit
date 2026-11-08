@@ -126,6 +126,7 @@ nav:
     - topics/PseudosPAW.md
     - topics/q-points.md
     - topics/RandStopPow.md
+    - topics/RDMFT.md
     - topics/Recursion.md
     - topics/RPACorrEn.md
     - topics/RTTDDFT.md

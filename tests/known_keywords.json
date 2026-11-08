@@ -71,6 +71,7 @@
     "RELAXATION": "Structural relaxations",
     "magnetic_constraint": "Tests employing magnetic constraints",
     "LWF": "Lattice Wannier functions",
+    "RDMFT": "Reduced density matrix functional theory",
     "RTTDDFT": "Real-time time-dependent DFT",
     "MINIMAL": "Quick set of tests covering all abinit optdriver and executables",
     "CC4S": "Interface between Abinit and CC4S code",

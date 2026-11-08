@@ -426,13 +426,14 @@ end subroutine rdmft_pnof_table_build
 !!  nk = number of k-points of the full BZ
 !!  n(nbk) = occupation numbers per spin of all the orbitals (only those in the table are used)
 !!  h1(nbk), jint(nbk,nbk), kint(nbk,nbk) = core Hamiltonian diagonal, J and K integrals
+!!  selfint = rdmft_selfint: 0 for the self-interaction free diagonal term n_a J_aa, 1 to add n_a^2 (J_aa-K_aa)
 !!
 !! SOURCE
-function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint) result(energy)
+function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint) result(energy)
 
  !Arguments ------------------------------------
  !scalars
- integer,intent(in) :: func,nk,nbk
+ integer,intent(in) :: func,nk,nbk,selfint
  type(rdmft_pnof_table_t),intent(in) :: table
  real(dp) :: energy
  !arrays
@@ -462,6 +463,8 @@ function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint) result(energy)
    na = n(ip)
    e1 = e1+two*na*h1(ip)
    e2 = e2+na*jint(ip,ip)
+   ! rdmft_selfint=1: same-spin self term of the orbital, n^2 (J_pp-K_pp), nonzero when K_pp /= J_pp (periodic systems)
+   if (selfint == 1) e2 = e2+na**2*(jint(ip,ip)-kint(ip,ip))
    do ib=1,table%ng
      if (ib == ia) cycle
      iq = table%gem_orb(ib)
