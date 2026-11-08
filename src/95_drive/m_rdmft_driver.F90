@@ -37,7 +37,7 @@ module m_rdmft_driver
  use m_rdmft_functionals, only : RDMFT_SD, RDMFT_POWER, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_active_space, &
                                  rdmft_energy_jk, rdmft_energy_pnof, rdmft_functional_name, rdmft_pnof_table_t
  use m_rdmft_hamiltonian, only : rdmft_one_electron
- use m_rdmft_optimizer,   only : rdmft_optimize_jk
+ use m_rdmft_optimizer,   only : rdmft_optimize_jk, rdmft_optimize_pnof
  use m_rdmft_integrals,  only : rdmft_ints_t
  use m_rdmft_orbitals,   only : rdmft_orbs_t
  use m_specialmsg,       only : wrtout
@@ -96,7 +96,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  type(pawfgr_type) :: pawfgr
  type(rdmft_ints_t) :: ints
  type(rdmft_pnof_table_t) :: table
- integer :: ierr2,ifunc,nbk,nocc_k,niter
+ integer :: ierr2,ifunc,nadded,nbk,nocc_k,niter
  integer,allocatable :: bandc(:),noccb(:),partner(:)
  logical :: conv
  real(dp) :: eopt,kt(3)
@@ -131,6 +131,16 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  maxdev = orbs%check_orthonormality()
  write(msg,'(2a,es12.4,a)') ch10,' RDMFT: maximum deviation from orthonormality of the orbitals = ',maxdev,ch10
  call wrtout([ab_out,std_out],msg)
+
+ !PNOF functionals need subspaces closed under k -> -k: complete the mesh with the time-reversed orbitals if needed
+ if (dtset%rdmft_functional >= RDMFT_PNOF5) then
+   call orbs%complete_time_reversal(nadded)
+   if (nadded > 0) then
+     write(msg,'(2a,i0,a,i0,a,i0,2a)') ch10,' RDMFT: the k-point mesh is not closed under k -> -k; ',nadded,&
+       ' k-points were added with the time-reversed orbitals (total ',orbs%nkpt,' k-points, weight 1/',orbs%nkpt,')',ch10
+     call wrtout([ab_out,std_out],msg)
+   end if
+ end if
 
  !FFT mesh and G^2 cut-off containing the products of two orbitals (same as for the density)
  call pawfgr_init(pawfgr,dtset,mgfftf,nfftf,ecut_eff,ecutdg_eff,ngfftc,ngfftf, &
@@ -193,6 +203,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ABI_MALLOC(actc,(nbk))
  ABI_MALLOC(bandc,(nbk))
  ABI_MALLOC(noccb,(nbk))
+ ABI_MALLOC(partner,(nbk))
  do ik=1,orbs%nkpt
    nocc_k = count(orbs%occ(1:orbs%nband(ik,1),ik,1) > one)
    do ib=1,orbs%nband(ik,1)
@@ -203,6 +214,9 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      h1c(ip) = h1diag(ib,ik)
      eigc(ip) = orbs%eig(ib,ik,1)
      occd(ip) = (nc(ip) > half)
+     ! Time-reversal partner (n,-k): the orbital itself for the time-reversal-invariant k-points and if -k is not in the mesh
+     partner(ip) = ip
+     if (orbs%tr_k(ik) > 0) partner(ip) = ints%offset(orbs%tr_k(ik))+ib
    end do
  end do
  eexch = zero
@@ -225,7 +239,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ', active occupied = ',count(occd.and.actc),', active virtual = ',count(.not.occd.and.actc),&
    ', frozen virtual = ',count(.not.occd.and..not.actc),ch10
  call wrtout([ab_out,std_out],msg)
- call table%build(nbk,eigc,occd,actc,dtset%rdmft_ncoupl,ierr2)
+ call table%build(nbk,eigc,occd,actc,partner,dtset%rdmft_ncoupl,ierr2)
  if (ierr2 /= 0) then
    write(msg,'(3a)') ' RDMFT: PNOF functionals skipped: no active occupied orbital or not enough virtual orbitals for',&
      ' rdmft_ncoupl (increase nband of the ground-state calculation or decrease rdmft_nocc_act/rdmft_ncoupl).',ch10
@@ -244,20 +258,8 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    if (dtset%rdmft_functional == RDMFT_POWER) then
      ABI_ERROR('RDMFT: the POWER functional is not yet available for the optimization (its exponent has no input variable).')
    end if
-   ! Time-reversal partner (n,-k) of each orbital, which shares its occupation. If -k is not in the mesh
-   ! the orbital has no partner (it is its own): the geminal (k up, -k down) only needs the integrals of the mesh
-   ! points, since J and K of the conjugate orbital at -k are those of the orbital at k.
-   ABI_MALLOC(partner,(nbk))
-   do ik=1,orbs%nkpt
-     jk = ik
-     do ib=1,orbs%nkpt
-       kt(:) = orbs%kpt(:,ik)+orbs%kpt(:,ib)
-       if (maxval(abs(kt(:)-anint(kt(:)))) < 1.0e-6_dp) jk = ib
-     end do
-     do ib=1,orbs%nband(ik,1)
-       partner(ints%offset(ik)+ib) = ints%offset(jk)+ib
-     end do
-   end do
+   ! The time-reversal partner (n,-k) shares the occupation; an orbital without partner in the mesh is its own
+   ! (the geminal (k up, -k down) only needs the integrals of the mesh points)
    ABI_MALLOC(nfix,(nbk))
    ABI_MALLOC(nopt,(nbk))
    nfix = zero
@@ -278,11 +280,40 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      write(msg,'(i6,f14.6,f16.10)') ib,eigc(ints%offset(1)+ib),nopt(ints%offset(1)+ib)
      call wrtout([ab_out,std_out],msg)
    end do
-   ABI_FREE(partner)
+   ABI_FREE(nfix)
+   ABI_FREE(nopt)
+ end if
+
+ ! Optimization of the occupation numbers (PNOF functionals) through the angles of the coupling subspaces
+ if (dtset%rdmft_functional >= RDMFT_PNOF5 .and. dtset%rdmft_functional <= RDMFT_GNOF) then
+   if (ierr2 /= 0) then
+     ABI_ERROR('RDMFT: no active occupied orbital or not enough virtual orbitals for rdmft_ncoupl (PNOF optimization).')
+   end if
+   ABI_MALLOC(nfix,(nbk))
+   ABI_MALLOC(nopt,(nbk))
+   nfix = zero
+   where (occd) nfix = one
+   call rdmft_optimize_pnof(dtset%rdmft_functional,table,orbs%nkpt,nbk,h1c,ints%jint,ints%kint,dtset%rdmft_selfint,nfix,&
+                            1.0e-8_dp,500,dtset%prtvol >= 10,nopt,eopt,conv,niter)
+   write(msg,'(2a,a,i0,a,l1,3a,es22.14,a,es22.14,a,es10.2,a)') ch10,' RDMFT: occupation numbers optimized for the ',&
+     'functional ',dtset%rdmft_functional,' (converged = ',conv,')',ch10,&
+     ' RDMFT: optimized total energy         = ',eopt+e_ewald+e_corepsp,&
+     '; energy with the ground-state occupations = ',etot,'  (optimized - ground state =',eopt+e_ewald+e_corepsp-etot,')'
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,i0,a,i0,a,i0,a,es14.6)') ' RDMFT: L-BFGS iterations = ',niter,'; classes = ',table%nclass,&
+     '; angles = ',table%ngam,'; sum of occupations (per k-point) = ',sum(nopt)/orbs%nkpt
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a)') ' RDMFT: occupation numbers of the first k-point (band, energy, n):'
+   call wrtout([ab_out,std_out],msg)
+   do ib=1,orbs%nband(1,1)
+     write(msg,'(i6,f14.6,f16.10)') ib,eigc(ints%offset(1)+ib),nopt(ints%offset(1)+ib)
+     call wrtout([ab_out,std_out],msg)
+   end do
    ABI_FREE(nfix)
    ABI_FREE(nopt)
  end if
  call table%free()
+ ABI_FREE(partner)
  ABI_FREE(nc)
  ABI_FREE(h1c)
  ABI_FREE(eigc)

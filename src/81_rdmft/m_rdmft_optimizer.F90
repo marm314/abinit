@@ -31,7 +31,8 @@ module m_rdmft_optimizer
  use m_abicore
  use m_errors
 
- use m_rdmft_functionals, only : rdmft_energy_jk, rdmft_jk_diag, rdmft_jk_pair
+ use m_rdmft_functionals, only : rdmft_energy_jk, rdmft_energy_pnof, rdmft_grad_pnof, rdmft_jk_diag, rdmft_jk_pair, &
+                                 rdmft_pnof_occ, rdmft_pnof_table_t
  use m_specialmsg,        only : wrtout
 
  implicit none
@@ -40,6 +41,7 @@ module m_rdmft_optimizer
 !!***
 
  public :: rdmft_optimize_jk
+ public :: rdmft_optimize_pnof
 !!***
 
 contains
@@ -555,6 +557,227 @@ contains
  end subroutine gradient_hessian
 
 end subroutine rdmft_optimize_jk
+!!***
+
+!!****f* m_rdmft_optimizer/rdmft_optimize_pnof
+!! NAME
+!!  rdmft_optimize_pnof
+!!
+!! FUNCTION
+!!  Optimize the occupation numbers of a PNOF functional through the angles gamma of its subspaces (see
+!!  rdmft_pnof_occ), which make the constraints and the box automatic: unconstrained limited-memory BFGS
+!!  (two-loop recursion, 10 pairs) with a backtracking Armijo line search, starting from all gamma = pi/4
+!!  as in ReRDMFT.
+!!
+!! INPUTS
+!!  func = PNOF functional
+!!  table <type(rdmft_pnof_table_t)> = pairs, subspaces, classes and variables
+!!  nk, nbk, h1, jint, kint, selfint = as rdmft_energy_pnof
+!!  nfix(nbk) = occupations of the orbitals that are not variables (1 for the frozen occupied orbitals, 0 otherwise)
+!!  gtol = convergence threshold on the largest component of the gradient
+!!  maxit = maximum number of iterations
+!!  check_grad = if true, compare the analytic gradient with finite differences at the start
+!!
+!! OUTPUT
+!!  nout(nbk) = optimized occupations of all the orbitals
+!!  energy = optimized electronic energy per unit cell
+!!  converged, niter
+!!
+!! SOURCE
+subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,nfix,gtol,maxit,check_grad,&
+                               nout,energy,converged,niter)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func,nk,nbk,selfint,maxit
+ real(dp),intent(in) :: gtol
+ logical,intent(in) :: check_grad
+ type(rdmft_pnof_table_t),intent(in) :: table
+ real(dp),intent(out) :: energy
+ logical,intent(out) :: converged
+ integer,intent(out) :: niter
+ !arrays
+ real(dp),intent(in) :: h1(nbk),jint(nbk,nbk),kint(nbk,nbk),nfix(nbk)
+ real(dp),intent(out) :: nout(nbk)
+
+ !Local variables-------------------------------
+ !scalars
+ integer,parameter :: nhist=10,max_ls=60
+ integer :: i,iter,ils,ih,nstored,ngam
+ real(dp),parameter :: pi4=0.78539816339744830962_dp,c1=1.0e-4_dp
+ real(dp) :: alph,beta,dirder,f0,ftrial,gamma_scale,sy,yy,fp,fm,step
+ character(len=500) :: msg
+ !arrays
+ real(dp),allocatable :: gam(:),gnew(:),g(:),dvec(:),gtrial(:),xtrial(:),smat(:,:),ymat(:,:),rho(:),alpha_l(:),q(:)
+
+! *************************************************************************
+
+ ngam = table%ngam
+ ABI_MALLOC(gam,(ngam))
+ ABI_MALLOC(g,(ngam))
+ ABI_MALLOC(gnew,(ngam))
+ ABI_MALLOC(dvec,(ngam))
+ ABI_MALLOC(gtrial,(ngam))
+ ABI_MALLOC(xtrial,(ngam))
+ ABI_MALLOC(smat,(ngam,nhist))
+ ABI_MALLOC(ymat,(ngam,nhist))
+ ABI_MALLOC(rho,(nhist))
+ ABI_MALLOC(alpha_l,(nhist))
+ ABI_MALLOC(q,(ngam))
+
+ gam = pi4
+ call eval(gam,f0,g)
+
+ if (check_grad) then
+   do i=1,min(3,ngam)
+     step = 1.0e-5_dp
+     xtrial = gam; xtrial(i) = gam(i)+step; call eval(xtrial,fp,gtrial)
+     xtrial = gam; xtrial(i) = gam(i)-step; call eval(xtrial,fm,gtrial)
+     write(msg,'(a,i0,a,es16.8,a,es16.8)') ' RDMFT PNOF gradient check, angle ',i,': analytic ',g(i),&
+       ' finite differences ',(fp-fm)/(two*step)
+     call wrtout([ab_out,std_out],msg)
+   end do
+ end if
+
+ nstored = 0
+ ih = 0
+ converged = .false.
+ niter = 0
+ do iter=1,maxit
+   niter = iter
+   if (maxval(abs(g)) < gtol) then
+     converged = .true.
+     exit
+   end if
+
+   ! Two-loop recursion: d = -H g
+   q = g
+   do i=nstored,1,-1
+     alpha_l(i) = rho(i)*sum(smat(:,i)*q)
+     q = q-alpha_l(i)*ymat(:,i)
+   end do
+   gamma_scale = one
+   if (nstored > 0) then
+     sy = sum(smat(:,nstored)*ymat(:,nstored)); yy = sum(ymat(:,nstored)**2)
+     if (yy > zero) gamma_scale = sy/yy
+   end if
+   q = gamma_scale*q
+   do i=1,nstored
+     beta = rho(i)*sum(ymat(:,i)*q)
+     q = q+smat(:,i)*(alpha_l(i)-beta)
+   end do
+   dvec = -q
+   dirder = sum(g*dvec)
+   if (dirder >= zero) then
+     ! not a descent direction: restart with the steepest descent
+     nstored = 0
+     dvec = -g
+     dirder = -sum(g**2)
+   end if
+
+   ! Backtracking Armijo line search
+   alph = one
+   if (nstored == 0) alph = min(one,one/max(maxval(abs(g)),tiny(one)))
+   do ils=1,max_ls
+     xtrial = gam+alph*dvec
+     call eval(xtrial,ftrial,gtrial)
+     if (ftrial <= f0+c1*alph*dirder) exit
+     alph = alph*half
+   end do
+
+   ! Update of the history if the curvature is positive
+   sy = sum((xtrial-gam)*(gtrial-g))
+   if (sy > 1.0e-10_dp*sqrt(sum((xtrial-gam)**2)*sum((gtrial-g)**2))) then
+     if (nstored == nhist) then
+       smat(:,1:nhist-1) = smat(:,2:nhist)
+       ymat(:,1:nhist-1) = ymat(:,2:nhist)
+       rho(1:nhist-1) = rho(2:nhist)
+       nstored = nhist-1
+     end if
+     nstored = nstored+1
+     smat(:,nstored) = xtrial-gam
+     ymat(:,nstored) = gtrial-g
+     rho(nstored) = one/sy
+   end if
+   gam = xtrial
+   g = gtrial
+   f0 = ftrial
+   if (mod(iter,10) == 1) then
+     write(msg,'(a,i5,a,es20.12,a,es10.3)') '   RDMFT PNOF L-BFGS iteration ',iter,'  E = ',f0,'  max|g| = ',maxval(abs(g))
+     call wrtout(std_out,msg)
+   end if
+ end do
+
+ call occupations(gam,nout)
+ energy = rdmft_energy_pnof(func,table,nk,nbk,nout,h1,jint,kint,selfint)
+
+ ABI_FREE(gam)
+ ABI_FREE(g)
+ ABI_FREE(gnew)
+ ABI_FREE(dvec)
+ ABI_FREE(gtrial)
+ ABI_FREE(xtrial)
+ ABI_FREE(smat)
+ ABI_FREE(ymat)
+ ABI_FREE(rho)
+ ABI_FREE(alpha_l)
+ ABI_FREE(q)
+
+contains
+
+ subroutine occupations(gv,nfull)
+   ! Occupations of all the orbitals from the angles
+   real(dp),intent(in) :: gv(ngam)
+   real(dp),intent(out) :: nfull(nbk)
+   integer :: jp
+   real(dp),allocatable :: nv(:),jac(:,:)
+   ABI_MALLOC(nv,(table%nvar))
+   ABI_MALLOC(jac,(table%nvar,ngam))
+   call rdmft_pnof_occ(table,gv,nv,jac)
+   nfull = nfix
+   do jp=1,nbk
+     if (table%orb_var(jp) > 0) nfull(jp) = nv(table%orb_var(jp))
+   end do
+   ABI_FREE(nv)
+   ABI_FREE(jac)
+ end subroutine occupations
+
+ subroutine eval(gv,e,gg)
+   ! Energy and gradient with respect to the angles
+   real(dp),intent(in) :: gv(ngam)
+   real(dp),intent(out) :: e,gg(ngam)
+   integer :: jp,jv,ji
+   real(dp),allocatable :: nv(:),jac(:,:),gorb(:),gvar(:),nfull(:)
+   ABI_MALLOC(nv,(table%nvar))
+   ABI_MALLOC(jac,(table%nvar,ngam))
+   ABI_MALLOC(gorb,(nbk))
+   ABI_MALLOC(gvar,(table%nvar))
+   ABI_MALLOC(nfull,(nbk))
+   call rdmft_pnof_occ(table,gv,nv,jac)
+   nfull = nfix
+   do jp=1,nbk
+     if (table%orb_var(jp) > 0) nfull(jp) = nv(table%orb_var(jp))
+   end do
+   e = rdmft_energy_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint)
+   call rdmft_grad_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint,gorb)
+   gvar = zero
+   do jp=1,nbk
+     if (table%orb_var(jp) > 0) gvar(table%orb_var(jp)) = gvar(table%orb_var(jp))+gorb(jp)
+   end do
+   gg = zero
+   do ji=1,ngam
+     do jv=1,table%nvar
+       gg(ji) = gg(ji)+gvar(jv)*jac(jv,ji)
+     end do
+   end do
+   ABI_FREE(nv)
+   ABI_FREE(jac)
+   ABI_FREE(gorb)
+   ABI_FREE(gvar)
+   ABI_FREE(nfull)
+ end subroutine eval
+
+end subroutine rdmft_optimize_pnof
 !!***
 
 end module m_rdmft_optimizer

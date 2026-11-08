@@ -92,6 +92,33 @@ module m_rdmft_functionals
    ! gem_principal(ng)
    ! True for the principal pair of its subspace.
 
+   integer :: nclass = 0
+   ! Number of classes (principal star with its coupled virtual stars). A class has one occupation variable per
+   ! star (the principal one and nvirt virtual ones) and nvirt angles gamma.
+
+   integer :: nvar = 0
+   ! Number of occupation variables (principal stars and virtual stars of all the classes).
+
+   integer :: ngam = 0
+   ! Number of angles gamma (the free parameters of the PNOF optimization).
+
+   integer,allocatable :: class_var(:)
+   ! class_var(nclass)
+   ! Index of the principal variable of each class; its virtual variables follow.
+
+   integer,allocatable :: class_nvirt(:)
+   ! class_nvirt(nclass)
+   ! Number of virtual stars of each class.
+
+   integer,allocatable :: var_mult(:)
+   ! var_mult(nvar)
+   ! Number of orbitals of the same subspace sharing the variable (2 for a generic-k virtual star in the subspace of a
+   ! time-reversal-invariant principal pair, else 1).
+
+   integer,allocatable :: orb_var(:)
+   ! orb_var(nbk)
+   ! Occupation variable of each orbital (0 for the frozen orbitals); the time-reversal partners share the variable.
+
  contains
 
    procedure :: free => rdmft_pnof_table_free
@@ -101,6 +128,8 @@ module m_rdmft_functionals
 !!***
 
  public :: rdmft_active_space
+ public :: rdmft_grad_pnof
+ public :: rdmft_pnof_occ
  public :: rdmft_jk_diag
  public :: rdmft_jk_pair
  public :: rdmft_energy_jk
@@ -428,6 +457,13 @@ subroutine rdmft_pnof_table_free(table)
  ABI_SFREE(table%gem_orb)
  ABI_SFREE(table%gem_sub)
  ABI_SFREE(table%gem_principal)
+ ABI_SFREE(table%class_var)
+ ABI_SFREE(table%class_nvirt)
+ ABI_SFREE(table%var_mult)
+ ABI_SFREE(table%orb_var)
+ table%nclass = 0
+ table%nvar = 0
+ table%ngam = 0
  table%ng = 0
  table%nsub = 0
 
@@ -517,24 +553,31 @@ end subroutine rdmft_active_space
 !!  rdmft_pnof_table_build
 !!
 !! FUNCTION
-!!  Build the pairs and subspaces from the orbital energies, over all k-points:
-!!  every active occupied orbital is the principal pair of a subspace, coupled with the (ncoupl-1) lowest unused
-!!  virtual orbitals (the highest principal pair takes the lowest virtuals, and so on). Pairs of different
-!!  k-points can share a subspace. The other occupied orbitals are trivial subspaces (frozen at 1).
-!!  The closure of the subspaces under k -> -k is not enforced here.
+!!  Build the pairs and coupling subspaces from the orbital energies, over all k-points, closed under k -> -k.
+!!  The time-reversal partner of an orbital is partner(p) (p itself for the time-reversal-invariant k-points);
+!!  a "star" is {p, partner(p)}. Every active occupied star is a principal star, from the highest energy to the lowest,
+!!  coupled with the (ncoupl-1) lowest unused virtual stars (over all k-points):
+!!   - principal orbital p with partner(p)=p: one subspace with p and all the orbitals of its virtual stars (a
+!!     generic virtual star has two orbitals with the same occupation);
+!!   - principal orbital p with partner(p)/=p: two mirror subspaces, {p, V_j} and {partner(p), partner(V_j)}, with the
+!!     same occupations; only generic virtual stars (two orbitals) can be used since a time-reversal-invariant
+!!     virtual orbital would belong to both.
+!!  The other occupied orbitals are trivial subspaces (frozen at 1).
 !!
 !! INPUTS
 !!  nbk = number of orbitals
 !!  eig(nbk) = orbital energies
 !!  occupied(nbk) = true for the occupied orbitals
 !!  active(nbk) = true for the active orbitals (see rdmft_active_space), only the occupied ones are used here
-!!  ncoupl = number of pairs of each subspace (1 principal + ncoupl-1 virtual)
+!!  partner(nbk) = time-reversal partner of each orbital
+!!  ncoupl = number of stars of each class (1 principal + ncoupl-1 virtual)
 !!
 !! OUTPUT
-!!  ierr = 0 if ok, 1 if there are no principal pair or not enough virtual orbitals
+!!  ierr = 0 if ok, 1 if there are no principal pair or not enough virtual orbitals,
+!!         2 if the active window is not closed under time reversal
 !!
 !! SOURCE
-subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,ncoupl,ierr)
+subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,partner,ncoupl,ierr)
 
  !Arguments ------------------------------------
  !scalars
@@ -542,40 +585,35 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,ncoupl,ierr)
  integer,intent(in) :: nbk,ncoupl
  integer,intent(out) :: ierr
  !arrays
+ integer,intent(in) :: partner(nbk)
  real(dp),intent(in) :: eig(nbk)
  logical,intent(in) :: occupied(nbk),active(nbk)
 
  !Local variables-------------------------------
  !scalars
- integer :: ip,ig,is,iv,jp,nprin,nocc,nvirt
+ integer :: ic,iv,ip,jp,m,nc,ng,nsub,nvar,sub1,sub2
+ logical :: trim_p
  !arrays
- integer,allocatable :: prin(:)
+ integer,allocatable :: cp(:),cv(:,:)
  logical,allocatable :: used(:)
 
 ! *************************************************************************
 
  call table%free()
  ierr = 0
- nocc = count(occupied)
- nvirt = nbk-nocc
- nprin = count(occupied .and. active)
- if (nprin < 1 .or. ncoupl < 2 .or. nprin*(ncoupl-1) > nvirt) then
+ m = ncoupl-1
+ if (m < 1 .or. count(occupied .and. active) < 1) then
    ierr = 1
    return
  end if
-
- table%ng = nocc+nprin*(ncoupl-1)
- table%nsub = nocc
- ABI_MALLOC(table%gem_orb,(table%ng))
- ABI_MALLOC(table%gem_sub,(table%ng))
- ABI_MALLOC(table%gem_principal,(table%ng))
  ABI_MALLOC(used,(nbk))
- ABI_MALLOC(prin,(nprin))
+ ABI_MALLOC(cp,(nbk))
+ ABI_MALLOC(cv,(m,nbk))
  used = .false.
+ nc = 0
 
- ! Principal pairs: the active occupied orbitals, from the highest energy to the lowest
- ig = 0
- do is=1,nprin
+ ! Principal stars (highest energy first), each with its virtual stars
+ do
    jp = 0
    do ip=1,nbk
      if (occupied(ip) .and. active(ip) .and. .not.used(ip)) then
@@ -586,48 +624,326 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,ncoupl,ierr)
        end if
      end if
    end do
+   if (jp == 0) exit
+   if (.not.active(partner(jp))) then
+     ierr = 2
+     exit
+   end if
+   trim_p = (partner(jp) == jp)
    used(jp) = .true.
-   prin(is) = jp
-   ig = ig+1
-   table%gem_orb(ig) = jp
-   table%gem_sub(ig) = is
-   table%gem_principal(ig) = .true.
- end do
- ! Coupled virtual pairs: the lowest unused virtual orbitals, block after block
- do is=1,nprin
-   do iv=1,ncoupl-1
-     jp = 0
-     do ip=1,nbk
-       if (.not.occupied(ip) .and. .not.used(ip)) then
-         if (jp == 0) then
-           jp = ip
-         else if (eig(ip) < eig(jp)) then
-           jp = ip
-         end if
+   used(partner(jp)) = .true.
+   nc = nc+1
+   cp(nc) = jp
+   do iv=1,m
+     ip = 0
+     do jp=1,nbk
+       if (occupied(jp) .or. used(jp)) cycle
+       if (.not.trim_p .and. partner(jp) == jp) cycle
+       if (ip == 0) then
+         ip = jp
+       else if (eig(jp) < eig(ip)) then
+         ip = jp
        end if
      end do
-     used(jp) = .true.
-     ig = ig+1
-     table%gem_orb(ig) = jp
-     table%gem_sub(ig) = is
-     table%gem_principal(ig) = .false.
+     if (ip == 0) then
+       ierr = 1
+       exit
+     end if
+     used(ip) = .true.
+     used(partner(ip)) = .true.
+     cv(iv,nc) = ip
+   end do
+   if (ierr /= 0) exit
+ end do
+ if (ierr /= 0) then
+   ABI_FREE(used)
+   ABI_FREE(cp)
+   ABI_FREE(cv)
+   return
+ end if
+
+ ! Tables of pairs and variables
+ ABI_MALLOC(table%gem_orb,(nbk))
+ ABI_MALLOC(table%gem_sub,(nbk))
+ ABI_MALLOC(table%gem_principal,(nbk))
+ ABI_MALLOC(table%orb_var,(nbk))
+ ABI_MALLOC(table%class_var,(nc))
+ ABI_MALLOC(table%class_nvirt,(nc))
+ ABI_MALLOC(table%var_mult,(nc*(m+1)))
+ table%orb_var = 0
+ table%nclass = nc
+ ng = 0
+ nsub = 0
+ nvar = 0
+ do ic=1,nc
+   jp = cp(ic)
+   table%class_var(ic) = nvar+1
+   table%class_nvirt(ic) = m
+   ! Principal variable
+   nvar = nvar+1
+   table%var_mult(nvar) = 1
+   table%orb_var(jp) = nvar
+   table%orb_var(partner(jp)) = nvar
+   nsub = nsub+1
+   sub1 = nsub
+   ng = ng+1
+   table%gem_orb(ng) = jp; table%gem_sub(ng) = sub1; table%gem_principal(ng) = .true.
+   sub2 = sub1
+   if (partner(jp) /= jp) then
+     nsub = nsub+1
+     sub2 = nsub
+     ng = ng+1
+     table%gem_orb(ng) = partner(jp); table%gem_sub(ng) = sub2; table%gem_principal(ng) = .true.
+   end if
+   ! Virtual variables
+   do iv=1,m
+     ip = cv(iv,ic)
+     nvar = nvar+1
+     table%orb_var(ip) = nvar
+     table%orb_var(partner(ip)) = nvar
+     ng = ng+1
+     table%gem_orb(ng) = ip; table%gem_sub(ng) = sub1; table%gem_principal(ng) = .false.
+     if (partner(jp) == jp) then
+       ! Time-reversal-invariant principal pair: the partner of a generic virtual orbital is in the same subspace
+       table%var_mult(nvar) = 1
+       if (partner(ip) /= ip) then
+         table%var_mult(nvar) = 2
+         ng = ng+1
+         table%gem_orb(ng) = partner(ip); table%gem_sub(ng) = sub1; table%gem_principal(ng) = .false.
+       end if
+     else
+       ! Generic principal pair: mirror subspace
+       table%var_mult(nvar) = 1
+       ng = ng+1
+       table%gem_orb(ng) = partner(ip); table%gem_sub(ng) = sub2; table%gem_principal(ng) = .false.
+     end if
    end do
  end do
+ table%nvar = nvar
+ table%ngam = nc*m
  ! Frozen occupied orbitals: trivial subspaces
- is = nprin
  do ip=1,nbk
    if (occupied(ip) .and. .not.used(ip)) then
-     ig = ig+1
-     is = is+1
-     table%gem_orb(ig) = ip
-     table%gem_sub(ig) = is
-     table%gem_principal(ig) = .true.
+     nsub = nsub+1
+     ng = ng+1
+     table%gem_orb(ng) = ip; table%gem_sub(ng) = nsub; table%gem_principal(ng) = .true.
    end if
  end do
+ table%ng = ng
+ table%nsub = nsub
+
  ABI_FREE(used)
- ABI_FREE(prin)
+ ABI_FREE(cp)
+ ABI_FREE(cv)
 
 end subroutine rdmft_pnof_table_build
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_pnof_occ
+!! NAME
+!!  rdmft_pnof_occ
+!!
+!! FUNCTION
+!!  Occupation numbers of the variables of the classes from the angles gamma, and the Jacobian dn_var/dgamma.
+!!  For a class with principal variable n_0 and m virtual variables with multiplicities mu_j:
+!!    n_0 = 1/2 + cos^2(gamma_0)/2,  y_j = R_{j-1} sin^2(gamma_j) (j<m),  y_m = R_{m-1},  R_j = R_{j-1} cos^2(gamma_j),
+!!    R_0 = 1 - n_0,  n_j = y_j / mu_j
+!!  so that n_0 + sum_j mu_j n_j = 1 for any angles and all the occupations are in (0,1).
+!!
+!! INPUTS
+!!  table <type(rdmft_pnof_table_t)> = classes and variables
+!!  gam(ngam) = angles
+!!
+!! OUTPUT
+!!  nvar_occ(nvar) = occupations of the variables
+!!  jac(nvar,ngam) = derivatives of the occupations with respect to the angles
+!!
+!! SOURCE
+subroutine rdmft_pnof_occ(table,gam,nvar_occ,jac)
+
+ !Arguments ------------------------------------
+ !scalars
+ type(rdmft_pnof_table_t),intent(in) :: table
+ !arrays
+ real(dp),intent(in) :: gam(table%ngam)
+ real(dp),intent(out) :: nvar_occ(table%nvar),jac(table%nvar,table%ngam)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ic,i,j,m,v0,g0
+ real(dp) :: c,s
+ !arrays
+ real(dp),allocatable :: dr(:),dy(:),rr(:)
+
+! *************************************************************************
+
+ nvar_occ = zero
+ jac = zero
+ g0 = 0
+ do ic=1,table%nclass
+   m = table%class_nvirt(ic)
+   v0 = table%class_var(ic)
+   ABI_MALLOC(rr,(0:m))
+   ABI_MALLOC(dr,(m+1))   ! dR_{j-1}/dgamma_i for the current j
+   ABI_MALLOC(dy,(m+1))
+   ! principal: n_0 = 1 - R_0, R_0 = sin^2(gamma_0)/2
+   s = sin(gam(g0+1)); c = cos(gam(g0+1))
+   rr(0) = half*s*s
+   nvar_occ(v0) = one-rr(0)
+   jac(v0,g0+1) = -s*c
+   dr = zero
+   dr(1) = s*c                         ! dR_0/dgamma_0
+   do j=1,m
+     if (j < m) then
+       s = sin(gam(g0+1+j)); c = cos(gam(g0+1+j))
+       ! y_j = R_{j-1} sin^2(gamma_j); index i refers to gamma_{i-1}
+       dy = zero
+       do i=1,j
+         dy(i) = dr(i)*s*s
+       end do
+       dy(j+1) = rr(j-1)*two*s*c
+       nvar_occ(v0+j) = rr(j-1)*s*s/real(table%var_mult(v0+j),dp)
+       do i=1,j+1
+         jac(v0+j,g0+i) = dy(i)/real(table%var_mult(v0+j),dp)
+       end do
+       ! R_j = R_{j-1} cos^2(gamma_j)
+       rr(j) = rr(j-1)*c*c
+       do i=1,j
+         dr(i) = dr(i)*c*c
+       end do
+       dr(j+1) = -rr(j-1)*two*s*c
+     else
+       ! last virtual variable takes the rest: y_m = R_{m-1}
+       nvar_occ(v0+j) = rr(j-1)/real(table%var_mult(v0+j),dp)
+       do i=1,j
+         jac(v0+j,g0+i) = dr(i)/real(table%var_mult(v0+j),dp)
+       end do
+     end if
+   end do
+   g0 = g0+m
+   ABI_FREE(rr)
+   ABI_FREE(dr)
+   ABI_FREE(dy)
+ end do
+
+end subroutine rdmft_pnof_occ
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_grad_pnof
+!! NAME
+!!  rdmft_grad_pnof
+!!
+!! FUNCTION
+!!  Gradient of the PNOF electronic energy with respect to the occupation number of each orbital of the table,
+!!  treating the occupations of all the orbitals as independent (the time-reversal partners are tied by the caller).
+!!  For GNOF the dependence of the pairing term on the occupation of the principal pair of the subspace is included.
+!!
+!! INPUTS
+!!  as rdmft_energy_pnof
+!!
+!! OUTPUT
+!!  grad(nbk) = dE/dn_p (zero for the orbitals that are not in the table)
+!!
+!! SOURCE
+subroutine rdmft_grad_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,grad)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func,nk,nbk,selfint
+ type(rdmft_pnof_table_t),intent(in) :: table
+ !arrays
+ real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk)
+ real(dp),intent(out) :: grad(nbk)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ia,ib,ig,ip,iq,sa,sb
+ real(dp),parameter :: tiny_den = 1.0e-300_dp
+ real(dp) :: dpi,dpr,dsa,dnd,ea,eb,f,g,hpa,hpb,na,nb,nda,ndb,nk2,sigma,viap
+ logical :: same_sub
+ !arrays
+ integer,allocatable :: prin_orb(:)
+ real(dp),allocatable :: gp(:),hprin(:)
+
+! *************************************************************************
+
+ grad = zero
+ nk2 = real(nk,dp)**2
+ ABI_MALLOC(prin_orb,(table%nsub))
+ ABI_MALLOC(hprin,(table%nsub))
+ ABI_MALLOC(gp,(table%nsub))
+ prin_orb = 0
+ hprin = one
+ gp = zero
+ do ig=1,table%ng
+   if (table%gem_principal(ig)) then
+     prin_orb(table%gem_sub(ig)) = table%gem_orb(ig)
+     hprin(table%gem_sub(ig)) = one-n(table%gem_orb(ig))
+   end if
+ end do
+
+ do ia=1,table%ng
+   ip = table%gem_orb(ia)
+   sa = table%gem_sub(ia)
+   na = n(ip)
+   grad(ip) = grad(ip)+two*h1(ip)/nk+(jint(ip,ip)+two*real(selfint,dp)*na*(jint(ip,ip)-kint(ip,ip)))/nk2
+   do ib=1,table%ng
+     if (ib == ia) cycle
+     iq = table%gem_orb(ib)
+     sb = table%gem_sub(ib)
+     nb = n(iq)
+     same_sub = (sa == sb)
+     viap = zero
+     if (same_sub) then
+       sigma = one
+       if (table%gem_principal(ia) .or. table%gem_principal(ib)) sigma = -one
+       dpi = zero
+       if (na > tiny_den) dpi = sigma*half*sqrt(max(zero,nb/na))
+       grad(ip) = grad(ip)+two*dpi*kint(ip,iq)/nk2
+     else
+       f = na*(one-na)
+       g = nb*(one-nb)
+       dpi = zero
+       select case (func)
+       case (RDMFT_PNOF5)
+         dpi = zero
+       case (RDMFT_PNOF7)
+         if (f > tiny_den) dpi = -half*sqrt(max(zero,g/f))*(one-two*na)
+       case (RDMFT_PNOF7S)
+         dpi = -four*(one-two*na)*g
+       case (RDMFT_GNOF)
+         if (.not.(table%gem_principal(ia) .and. table%gem_principal(ib))) then
+           hpa = hprin(sa); hpb = hprin(sb)
+           ea = exp(-(hpa/gnof_c)**2); eb = exp(-(hpb/gnof_c)**2)
+           nda = na*ea; ndb = nb*eb
+           sigma = one
+           if (table%gem_principal(ia) .neqv. table%gem_principal(ib)) sigma = -one
+           dnd = ndb
+           if (nda > tiny_den) dnd = ndb+sigma*half*sqrt(max(zero,ndb/nda))
+           dsa = zero
+           if (f > tiny_den) dsa = half*sqrt(max(zero,g/f))*(one-two*na)
+           dpi = dnd*ea-dsa
+           viap = dnd*nda*two*hpa/gnof_c**2
+         end if
+       case default
+         ABI_ERROR('RDMFT: unknown PNOF functional.')
+       end select
+       dpr = nb*(two*jint(ip,iq)-kint(ip,iq))+dpi*kint(ip,iq)
+       grad(ip) = grad(ip)+two*dpr/nk2
+       if (viap /= zero) gp(sa) = gp(sa)+two*viap*kint(ip,iq)/nk2
+     end if
+   end do
+ end do
+ ! Dependence through the occupation of the principal pair of the subspace (GNOF)
+ do ig=1,table%nsub
+   if (prin_orb(ig) > 0) grad(prin_orb(ig)) = grad(prin_orb(ig))+gp(ig)
+ end do
+
+ ABI_FREE(prin_orb)
+ ABI_FREE(hprin)
+ ABI_FREE(gp)
+
+end subroutine rdmft_grad_pnof
 !!***
 
 !!****f* m_rdmft_functionals/rdmft_energy_pnof

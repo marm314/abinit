@@ -19876,7 +19876,11 @@ JK-only functionals:
   * 9 --> POWER (not yet available for the optimization)
   * 10 --> MULLER_AS, antisymmetrized Muller (not equal to Hartree-Fock for integer occupations)
 
-PNOF functionals (energy only for the moment): 21 --> PNOF5, 22 --> PNOF7, 23 --> PNOF7s, 24 --> GNOF.
+PNOF functionals: 21 --> PNOF5, 22 --> PNOF7, 23 --> PNOF7s, 24 --> GNOF. The occupations are parametrized by
+angles of the coupling subspaces ([[rdmft_ncoupl]]) and optimized with L-BFGS. The subspaces must be closed under
+$\\mathbf{k}\\rightarrow-\\mathbf{k}$: if the k-point mesh does not contain $-\\mathbf{k}$ for all its points, the mesh is
+completed with the time-reversed orbitals ($c_{n,-\\mathbf{k}}(\\mathbf{G})=c^*_{n\\mathbf{k}}(-\\mathbf{G})$), giving a mesh of twice the
+number of points.
 """,
 ),
 
@@ -19894,6 +19898,10 @@ Variable(
 Size of the coupling subspaces of the PNOF functionals, in pairs of orbitals: each active occupied orbital (principal pair)
 is coupled with **rdmft_ncoupl** - 1 virtual orbitals. The virtual orbitals are the lowest unused ones over all the
 k-points, so that orbitals of different k-points can share a subspace. The default 2 is the perfect pairing.
+The subspaces are closed under $\\mathbf{k}\\rightarrow-\\mathbf{k}$: the time-reversal partner of a virtual orbital at a generic
+k-point (with the same occupation) belongs to the same subspace when the principal pair is at a time-reversal-invariant
+k-point, and to the mirror subspace of the partner of the principal pair otherwise. The virtual orbitals counted by
+**rdmft_ncoupl** are thus "stars" {k, -k}.
 The number of virtual orbitals of the ground-state calculation ([[nband]]) must be large enough. The
 JK-only functionals do not use this variable.
 """,
