@@ -65,6 +65,13 @@ of the partners is refused. The JK-only functionals use the mesh as it is: the e
 integrals among the k-points of the mesh, and the occupations of $\mathbf{k}$ and $-\mathbf{k}$ are
 tied if both are present.
 
+The energy functionals only use the integrals $K_{pq}$ (not the time-inversion integrals $L_{pq}$, which equal $K_{pq}$ only
+when the orbital at $-\mathbf{k}$ is the conjugate of the one at $\mathbf{k}$ with a fixed phase), and $K_{pq}$ does not depend on the
+phase of the orbitals. No alignment of the phases of the time-reversed partners is therefore needed. The ties of the
+occupations of $\mathbf{k}$ and $-\mathbf{k}$ do assume that the orbital $n$ at $-\mathbf{k}$ is the conjugate of the orbital $n$ at
+$\mathbf{k}$ up to a phase; this is checked at the start (largest $1-|\langle\psi_{n,-\mathbf{k}}|\Theta\psi_{n\mathbf{k}}\rangle|$ is
+printed, with a warning if it is larger than $10^{-4}$, for example for a mixture of degenerate states).
+
 ## Active space and cost
 
 The occupations that are optimized are those of the active orbitals: the occupied orbitals with an energy larger

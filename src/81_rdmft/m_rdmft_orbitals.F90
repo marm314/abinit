@@ -139,6 +139,9 @@ module m_rdmft_orbitals
    procedure :: rotate_pair => rdmft_orbs_rotate_pair
    ! Rotate two bands of one k-point.
 
+   procedure :: tr_alignment => rdmft_orbs_tr_alignment
+   ! Deviation of the orbitals at -k from the time-reversed ones of k.
+
  end type rdmft_orbs_t
 !!***
 
@@ -520,6 +523,77 @@ subroutine rdmft_orbs_rotate_pair(orbs,ik,ib,jb,umat)
  end do
 
 end subroutine rdmft_orbs_rotate_pair
+!!***
+
+!!****f* m_rdmft_orbitals/rdmft_orbs_tr_alignment
+!! NAME
+!!  rdmft_orbs_tr_alignment
+!!
+!! FUNCTION
+!!  For every k-point with its partner -k in the mesh (tr_k>0, possibly itself), compare the orbital n at -k with the
+!!  time-reversed orbital n of k, Theta psi_{nk}: c'(G') = conjg(c_{nk}(G)) with G' = -G - R, R = k + (-k).
+!!  The overlap |<psi_{n,-k}|Theta psi_{nk}>| is 1 when the orbital at -k is the conjugate of the one at k up to a
+!!  phase, which is the pairing assumed when the occupations of k and -k are tied (the energy functionals themselves
+!!  only use K_pq, which does not depend on these phases).
+!!
+!! OUTPUT
+!!  maxdev = largest 1-|overlap| over the bands and k-points having a partner
+!!  ik_worst, ib_worst = where it is found (0 if no k-point has a partner)
+!!
+!! SOURCE
+subroutine rdmft_orbs_tr_alignment(orbs,maxdev,ik_worst,ib_worst)
+
+ !Arguments ------------------------------------
+ !scalars
+ class(rdmft_orbs_t),intent(in) :: orbs
+ real(dp),intent(out) :: maxdev
+ integer,intent(out) :: ik_worst,ib_worst
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ib,ig,ik,jk,m,n1,idx,nb
+ real(dp) :: dev
+ complex(dpc) :: ovlp
+ !arrays
+ integer :: rr(3)
+ integer,allocatable :: lookup(:)
+
+! *************************************************************************
+
+ maxdev = zero
+ ik_worst = 0
+ ib_worst = 0
+ m = max(maxval(abs(orbs%kg)),1)+2
+ n1 = 2*m+1
+ ABI_MALLOC(lookup,(n1**3))
+ do ik=1,orbs%nkpt
+   jk = orbs%tr_k(ik)
+   if (jk <= 0) cycle
+   nb = orbs%nband(ik,1)
+   ! Index of the plane waves of -k
+   lookup = 0
+   do ig=1,orbs%npw(jk)
+     lookup(1+(orbs%kg(1,ig,jk)+m)+n1*((orbs%kg(2,ig,jk)+m)+n1*(orbs%kg(3,ig,jk)+m))) = ig
+   end do
+   rr = nint(orbs%kpt(:,ik)+orbs%kpt(:,jk))
+   do ib=1,nb
+     ovlp = czero
+     do ig=1,orbs%npw(ik)
+       idx = lookup(1+(-orbs%kg(1,ig,ik)-rr(1)+m)+n1*((-orbs%kg(2,ig,ik)-rr(2)+m)+n1*(-orbs%kg(3,ig,ik)-rr(3)+m)))
+       if (idx == 0) cycle
+       ! <psi_{n,-k}|Theta psi_{nk}> = sum_G' conjg(c_{n,-k}(G')) conjg(c_{nk}(G))
+       ovlp = ovlp+conjg(cmplx(orbs%cg(1,idx,ib,jk,1),orbs%cg(2,idx,ib,jk,1),kind=dpc))* &
+                   conjg(cmplx(orbs%cg(1,ig,ib,ik,1),orbs%cg(2,ig,ib,ik,1),kind=dpc))
+     end do
+     dev = one-abs(ovlp)
+     if (dev > maxdev) then
+       maxdev = dev; ik_worst = ik; ib_worst = ib
+     end if
+   end do
+ end do
+ ABI_FREE(lookup)
+
+end subroutine rdmft_orbs_tr_alignment
 !!***
 
 !!****f* m_rdmft_orbitals/rdmft_orbs_check_orthonormality

@@ -99,11 +99,11 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  !Local variables-------------------------------
  !scalars
  integer,parameter :: master=0
- integer :: ib,ierr,ierr_t,ifunc,ik,ip,iq,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
+ integer :: ib,ierr,ierr_t,ifunc,ik,ik_w,ib_w,ip,iq,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
  logical :: conv,is_jk,is_pnof,need_table,ok_fd,table_ok
  real(dp),parameter :: eps_box=1.0e-6_dp
  real(dp) :: alpha,e_corepsp,e_ewald,eexch,ehartree,ekin_tot,eone,eopt,ecut_eff,ecutdg_eff,etot,gsqcutc_eff,gsqcutf_eff
- real(dp) :: maxdev,ntarget,nk2,sexch,shart
+ real(dp) :: devtr,maxdev,ntarget,nk2,sexch,shart
  character(len=500) :: msg
  character(len=fnlen) :: wfk_path
  type(pawfgr_type) :: pawfgr
@@ -143,6 +143,21 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  maxdev = orbs%check_orthonormality()
  write(msg,'(2a,es12.4,a)') ch10,' RDMFT: maximum deviation from orthonormality of the orbitals = ',maxdev,ch10
  call wrtout([ab_out,std_out],msg)
+
+ !Alignment of the orbitals at -k with the time-reversed orbitals of k (assumed by the ties of the occupations of k and -k)
+ call orbs%tr_alignment(devtr,ik_w,ib_w)
+ if (ik_w > 0) then
+   write(msg,'(2a,es10.2,2(a,i0),a)') ' RDMFT: time-reversal alignment of the orbitals at -k with those at k:',&
+     ' largest 1-|<psi_-k|Theta psi_k>| = ',devtr,' (k-point ',ik_w,', band ',ib_w,')'
+   call wrtout([ab_out,std_out],msg)
+   if (devtr > 1.0e-4_dp) then
+     write(msg,'(7a)') ' RDMFT: WARNING: the orbitals at -k are not the conjugates of the ones at k (up to a phase), for',&
+       ' example in a degenerate shell.',ch10,&
+       '        The energy functionals only use K_pq and do not depend on this, but the occupations of k and -k are tied:',&
+       ch10,'        the pairing of degenerate states with different occupations is then ambiguous.',ch10
+     call wrtout([ab_out,std_out],msg)
+   end if
+ end if
 
  !PNOF functionals need subspaces closed under k -> -k: complete the mesh with the time-reversed orbitals if needed
  if (is_pnof) then
