@@ -832,7 +832,7 @@ subroutine driver(codvsn,cpui,dtsets,filnam,filstat,&
      call rttddft(codvsn,dtfil,dtset,mpi_enregs(idtset),pawang,pawrad,pawtab,psps)
 
    case (RUNL_RDMFT)
-     call rdmft_driver(codvsn,dtfil,dtset)
+     call rdmft_driver(codvsn,dtfil,dtset,mpi_enregs(idtset),pawrad,pawtab,psps)
 
    case default
      write(msg,'(a,i0,4a)')&

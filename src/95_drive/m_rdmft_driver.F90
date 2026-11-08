@@ -22,6 +22,10 @@
 module m_rdmft_driver
 
  use defs_basis
+ use defs_abitypes,        only : MPI_type
+ use defs_datatypes,       only : pseudopotential_type
+ use m_pawrad,           only : pawrad_type
+ use m_pawtab,           only : pawtab_type
  use m_errors
  use m_xmpi
  use m_dtfil,            only : datafiles_type
@@ -30,6 +34,7 @@ module m_rdmft_driver
  use m_nctk,             only : nctk_try_fort_or_ncfile
  use m_rdmft,            only : rdmft_hello
  use m_pawfgr,           only : pawfgr_type, pawfgr_init, pawfgr_destroy
+ use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_integrals,  only : rdmft_ints_t
  use m_rdmft_orbitals,   only : rdmft_orbs_t
  use m_specialmsg,       only : wrtout
@@ -63,18 +68,25 @@ contains
 !!  (only printing)
 !!
 !! SOURCE
-subroutine rdmft_driver(codvsn,dtfil,dtset)
+subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
 
  !Arguments ------------------------------------
  !scalars
  character(len=8),intent(in) :: codvsn
  type(datafiles_type),intent(in) :: dtfil
- type(dataset_type),intent(in) :: dtset
+ type(dataset_type),intent(inout) :: dtset
+ type(MPI_type),intent(inout) :: mpi_enreg
+ type(pseudopotential_type),intent(inout) :: psps
+ !arrays
+ type(pawrad_type),intent(inout) :: pawrad(psps%ntypat*psps%usepaw)
+ type(pawtab_type),intent(inout) :: pawtab(psps%ntypat*psps%usepaw)
 
  !Local variables-------------------------------
  !scalars
  integer,parameter :: master=0
  integer :: ierr,ik,iq,ip,jb,jk,ib,mgfftf,nfftf
+ real(dp),allocatable :: h1diag(:,:),ekin(:,:)
+ real(dp) :: e_corepsp,e_ewald,eone,etot,ekin_tot
  real(dp) :: ecut_eff,ecutdg_eff,ehartree,eexch,gsqcutc_eff,gsqcutf_eff,maxdev,np,nq
  character(len=500) :: msg
  character(len=fnlen) :: wfk_path
@@ -140,6 +152,28 @@ subroutine rdmft_driver(codvsn,dtfil,dtset)
    ' Ha, exchange energy = ',eexch,' Ha',ch10
  call wrtout([ab_out,std_out],msg)
 
+
+ !One-electron part: h_pp with getghc, Ewald and core energies
+ call rdmft_one_electron(orbs,dtset,dtfil,gsqcutf_eff,mpi_enreg,pawfgr,pawrad,pawtab,psps,h1diag,ekin,e_ewald,e_corepsp)
+ eone = zero
+ ekin_tot = zero
+ do ik=1,orbs%nkpt
+   do ib=1,orbs%nband(ik,1)
+     eone = eone+orbs%wtk(ik)*orbs%occ(ib,ik,1)*h1diag(ib,ik)
+     ekin_tot = ekin_tot+orbs%wtk(ik)*orbs%occ(ib,ik,1)*ekin(ib,ik)
+   end do
+ end do
+ etot = eone+ehartree+eexch+e_ewald+e_corepsp
+ write(msg,'(2a,es22.14,2a,es22.14,2a,es22.14,2a,es22.14,2a,es22.14,2a,es22.14,a)') &
+   ch10,' RDMFT: kinetic energy                         = ',ekin_tot,&
+   ch10,' RDMFT: one-electron energy (T + Vloc + Vnl)    = ',eone,&
+   ch10,' RDMFT: Ewald energy                           = ',e_ewald,&
+   ch10,' RDMFT: core pseudopotential energy             = ',e_corepsp,&
+   ch10,' RDMFT: Hartree + exchange                      = ',ehartree+eexch,&
+   ch10,' RDMFT: total energy (SD, ground-state occ.)    = ',etot,ch10
+ call wrtout([ab_out,std_out],msg)
+ ABI_FREE(h1diag)
+ ABI_FREE(ekin)
 
  call ints%free()
  call pawfgr_destroy(pawfgr)
