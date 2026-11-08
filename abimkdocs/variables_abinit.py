@@ -19848,6 +19848,39 @@ for the occupied (virtual) orbitals.
 ),
 
 Variable(
+    abivarname="rdmft_functional",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_basic"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: FUNCTIONAL",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Functional of an RDMFT calculation ([[optdriver]] = 11). With 0 the occupation numbers are not optimized, and the
+energies of all the functionals are only evaluated with the occupations of the ground-state calculation.
+Otherwise the occupation numbers of the active orbitals are optimized for fixed orbitals (JK-only functionals), with
+the orbitals of the ground-state calculation (read with [[getwfk]]).
+
+JK-only functionals:
+
+  * 1 --> SD, single determinant (Hartree-Fock)
+  * 2 --> MBB, Muller (Buijse-Baerends)
+  * 3 --> CA, Csanyi-Arias
+  * 4 --> RHFB, Hartree-Fock-Bogoliubov (for attractive interactions)
+  * 5 --> CGA, Csanyi-Goedecker-Arias
+  * 6 --> ML, Marques-Lathiotakis
+  * 7 --> MLSIC, Marques-Lathiotakis, self-interaction corrected
+  * 8 --> GU, Goedecker-Umrigar
+  * 9 --> POWER (not yet available for the optimization)
+  * 10 --> MULLER_AS, antisymmetrized Muller (not equal to Hartree-Fock for integer occupations)
+
+PNOF functionals (energy only for the moment): 21 --> PNOF5, 22 --> PNOF7, 23 --> PNOF7s, 24 --> GNOF.
+""",
+),
+
+Variable(
     abivarname="rdmft_ncoupl",
     varset="dev",
     vartype="integer",

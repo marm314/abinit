@@ -22,6 +22,7 @@ sources = [
 "m_rdmft_functionals.F90",
 "m_rdmft_hamiltonian.F90",
 "m_rdmft_integrals.F90",
+"m_rdmft_optimizer.F90",
 "m_rdmft_orbitals.F90",
  ]
 # IMPORTANT : please use the alphabetic order in the previous list. Do NOT add the new routine names at the end of the list.

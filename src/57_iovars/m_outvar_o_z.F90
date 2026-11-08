@@ -877,6 +877,9 @@ contains
  dprarr(1,:)=dtsets(:)%rdmft_ecut_act
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_ecut_act','ENE',0)
 
+ intarr(1,:)=dtsets(:)%rdmft_functional
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_functional','INT',0)
+
  intarr(1,:)=dtsets(:)%rdmft_ncoupl
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_ncoupl','INT',0)
 

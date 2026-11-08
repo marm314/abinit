@@ -48,8 +48,7 @@ module m_rdmft_functionals
  integer,parameter,public :: RDMFT_MLSIC     = 7   ! Marques-Lathiotakis, self-interaction corrected
  integer,parameter,public :: RDMFT_GU        = 8   ! Goedecker-Umrigar
  integer,parameter,public :: RDMFT_POWER     = 9   ! (n_p n_q)^alpha
- integer,parameter,public :: RDMFT_BBC2      = 10  ! Buijse-Baerends corrected (BBC2)
- integer,parameter,public :: RDMFT_MULLER_AS = 11  ! Antisymmetrized Muller (not HF at integer occupations)
+ integer,parameter,public :: RDMFT_MULLER_AS = 10  ! Antisymmetrized Muller (not HF at integer occupations)
  ! Identifiers of the PNOF functionals
  integer,parameter,public :: RDMFT_PNOF5     = 21
  integer,parameter,public :: RDMFT_PNOF7     = 22
@@ -102,6 +101,8 @@ module m_rdmft_functionals
 !!***
 
  public :: rdmft_active_space
+ public :: rdmft_jk_diag
+ public :: rdmft_jk_pair
  public :: rdmft_energy_jk
  public :: rdmft_energy_pnof
  public :: rdmft_functional_name
@@ -137,7 +138,6 @@ function rdmft_functional_name(func) result(name)
  case (RDMFT_MLSIC);     name = 'MLSIC'
  case (RDMFT_GU);        name = 'GU'
  case (RDMFT_POWER);     name = 'POWER'
- case (RDMFT_BBC2);      name = 'BBC2'
  case (RDMFT_MULLER_AS); name = 'MULLER_AS'
  case (RDMFT_PNOF5);     name = 'PNOF5'
  case (RDMFT_PNOF7);     name = 'PNOF7'
@@ -160,17 +160,16 @@ end function rdmft_functional_name
 !!  func = functional
 !!  ni,nj = occupation numbers (per spin)
 !!  same = true if i and j are the same orbital
-!!  weak_i,weak_j = true if the orbitals are weakly occupied (only used by BBC2)
 !!  alpha = exponent of the POWER functional
 !!
 !! SOURCE
-function jk_exchange(func,ni,nj,same,weak_i,weak_j,alpha) result(fx)
+function jk_exchange(func,ni,nj,same,alpha) result(fx)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func
  real(dp),intent(in) :: ni,nj,alpha
- logical,intent(in) :: same,weak_i,weak_j
+ logical,intent(in) :: same
  real(dp) :: fx
 
  !Local variables-------------------------------
@@ -207,16 +206,6 @@ function jk_exchange(func,ni,nj,same,weak_i,weak_j,alpha) result(fx)
    end if
  case (RDMFT_POWER)
    fx = x**alpha
- case (RDMFT_BBC2)
-   if (same) then
-     fx = ni
-   else if (weak_i .and. weak_j) then
-     fx = -sqrt(max(zero,x))
-   else if ((.not.weak_i) .and. (.not.weak_j)) then
-     fx = x
-   else
-     fx = sqrt(max(zero,x))
-   end if
  case (RDMFT_MULLER_AS)
    fx = half*(x-sqrt(max(zero,x)))
  case default
@@ -224,6 +213,151 @@ function jk_exchange(func,ni,nj,same,weak_i,weak_j,alpha) result(fx)
  end select
 
 end function jk_exchange
+!!***
+
+!!****f* m_rdmft_functionals/fx_pair
+!! NAME
+!!  fx_pair
+!!
+!! FUNCTION
+!!  Exchange function f_X(a,b) of two different orbitals and its derivatives with respect to the first argument
+!!  (d1, d11) and the mixed second derivative (d12).
+!!
+!! SOURCE
+subroutine fx_pair(func,a,b,alpha,f,d1,d11,d12)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func
+ real(dp),intent(in) :: a,b,alpha
+ real(dp),intent(out) :: f,d1,d11,d12
+
+ !Local variables-------------------------------
+ !scalars
+ real(dp) :: dd,gp,gpp,mm,phi,phip,psi,psip,s,sp,sq,su,sv,x
+ real(dp),parameter :: tiny_den = 1.0e-300_dp
+
+! *************************************************************************
+
+ x = a*b
+ s = sqrt(max(zero,x))
+ select case (func)
+ case (RDMFT_SD)
+   f = x; d1 = b; d11 = zero; d12 = one
+ case (RDMFT_MBB, RDMFT_GU)
+   f = s; d1 = half*sqrt(max(zero,b/a)); d11 = -0.25_dp*sqrt(max(zero,b))*a**(-1.5_dp)
+   d12 = zero; if (s > tiny_den) d12 = 0.25_dp/s
+ case (RDMFT_CA, RDMFT_RHFB)
+   su = sqrt(max(zero,a*(one-a))); sv = sqrt(max(zero,b*(one-b)))
+   phi = (one-two*a)/(two*su)
+   phip = -one/su-0.25_dp*(one-two*a)**2/(a*(one-a)*su)
+   if (func == RDMFT_CA) then
+     f = su*sv+x; d1 = phi*sv+b; d11 = phip*sv; d12 = one
+     if (sv > tiny_den) d12 = phi*(one-two*b)/(two*sv)+one
+   else
+     f = -su*sv+x; d1 = -phi*sv+b; d11 = -phip*sv; d12 = one
+     if (sv > tiny_den) d12 = -phi*(one-two*b)/(two*sv)+one
+   end if
+ case (RDMFT_CGA)
+   sp = sqrt(max(zero,a*(two-a))); sq = sqrt(max(zero,b*(two-b)))
+   psi = half*(one-a)/sp
+   psip = -half/sp-half*(one-a)**2/(a*(two-a)*sp)
+   f = half*(x+sp*sq); d1 = half*b+psi*sq; d11 = psip*sq; d12 = half
+   if (sq > tiny_den) d12 = half+psi*(one-b)/sq
+ case (RDMFT_ML, RDMFT_MLSIC)
+   if (func == RDMFT_ML) then
+     dd = one+ml_b1*x; mm = ml_a0+two*ml_a1*x+ml_a1*ml_b1*x*x
+     f = x*(ml_a0+ml_a1*x)/dd
+     gp = mm/dd**2; gpp = two*(ml_a1*dd**2-ml_b1*mm)/dd**3
+   else
+     dd = one+mlsic_b1*x; mm = mlsic_a0+two*mlsic_a1*x+mlsic_a1*mlsic_b1*x*x
+     f = x*(mlsic_a0+mlsic_a1*x)/dd
+     gp = mm/dd**2; gpp = two*(mlsic_a1*dd**2-mlsic_b1*mm)/dd**3
+   end if
+   d1 = gp*b; d11 = gpp*b*b; d12 = gpp*x+gp
+ case (RDMFT_POWER)
+   f = x**alpha; d1 = alpha*a**(alpha-one)*b**alpha; d11 = alpha*(alpha-one)*a**(alpha-two)*b**alpha
+   d12 = alpha*alpha*x**(alpha-one)
+ case (RDMFT_MULLER_AS)
+   f = half*(x-s); d1 = half*(b-half*sqrt(max(zero,b/a))); d11 = half*0.25_dp*sqrt(max(zero,b))*a**(-1.5_dp)
+   d12 = half; if (s > tiny_den) d12 = half*(one-0.25_dp/s)
+ case default
+   ABI_ERROR('RDMFT: unknown JK-only functional.')
+ end select
+
+end subroutine fx_pair
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_jk_pair
+!! NAME
+!!  rdmft_jk_pair
+!!
+!! FUNCTION
+!!  For two different orbitals with occupations a and b and integrals jv, kv: the pair energy function
+!!  F(a,b) = 2 f_H(a,b) J - f_X(a,b) K and its derivatives Fa=dF/da, Faa=d2F/da2, Fab=d2F/dadb.
+!!
+!! SOURCE
+subroutine rdmft_jk_pair(func,a,b,jv,kv,alpha,ff,fa,faa,fab)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func
+ real(dp),intent(in) :: a,b,jv,kv,alpha
+ real(dp),intent(out) :: ff,fa,faa,fab
+
+ !Local variables-------------------------------
+ !scalars
+ real(dp) :: fx,x1,x11,x12,fh,h1,h11,h12
+
+! *************************************************************************
+
+ call fx_pair(func,a,b,alpha,fx,x1,x11,x12)
+ if (func == RDMFT_MULLER_AS) then
+   fh = fx; h1 = x1; h11 = x11; h12 = x12
+ else
+   fh = a*b; h1 = b; h11 = zero; h12 = one
+ end if
+ ff = two*fh*jv-fx*kv
+ fa = two*h1*jv-x1*kv
+ faa = two*h11*jv-x11*kv
+ fab = two*h12*jv-x12*kv
+
+end subroutine rdmft_jk_pair
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_jk_diag
+!! NAME
+!!  rdmft_jk_diag
+!!
+!! FUNCTION
+!!  Same-orbital term F_d(n) = F(n,n) of the energy (with the special diagonal definitions of MLSIC and GU)
+!!  and its first and second derivatives with respect to n, for an orbital with integrals jv=J_pp, kv=K_pp.
+!!
+!! SOURCE
+subroutine rdmft_jk_diag(func,n,jv,kv,alpha,fd,fd1,fd2)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func
+ real(dp),intent(in) :: n,jv,kv,alpha
+ real(dp),intent(out) :: fd,fd1,fd2
+
+ !Local variables-------------------------------
+ !scalars
+ real(dp) :: ff,fa,faa,fab
+
+! *************************************************************************
+
+ select case (func)
+ case (RDMFT_MLSIC, RDMFT_GU)
+   fd = n*n*(two*jv-kv); fd1 = two*n*(two*jv-kv); fd2 = two*(two*jv-kv)
+ case default
+   ! The general pair function at equal occupations 
+   call rdmft_jk_pair(func,n,n,jv,kv,alpha,ff,fa,faa,fab)
+   fd = ff; fd1 = two*fa; fd2 = two*faa+two*fab
+ end select
+
+end subroutine rdmft_jk_diag
 !!***
 
 !!****f* m_rdmft_functionals/rdmft_energy_jk
@@ -239,11 +373,10 @@ end function jk_exchange
 !!  n(nbk) = occupation numbers per spin of all the orbitals (composite index)
 !!  h1(nbk) = diagonal elements of the core Hamiltonian
 !!  jint(nbk,nbk), kint(nbk,nbk) = J and K integrals (cell-normalized)
-!!  weak(nbk) = true for the weakly occupied orbitals (BBC2)
 !!  alpha = exponent of the POWER functional
 !!
 !! SOURCE
-function rdmft_energy_jk(func,nk,nbk,n,h1,jint,kint,weak,alpha) result(energy)
+function rdmft_energy_jk(func,nk,nbk,n,h1,jint,kint,alpha) result(energy)
 
  !Arguments ------------------------------------
  !scalars
@@ -252,7 +385,6 @@ function rdmft_energy_jk(func,nk,nbk,n,h1,jint,kint,weak,alpha) result(energy)
  real(dp) :: energy
  !arrays
  real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk)
- logical,intent(in) :: weak(nbk)
 
  !Local variables-------------------------------
  !scalars
@@ -266,7 +398,7 @@ function rdmft_energy_jk(func,nk,nbk,n,h1,jint,kint,weak,alpha) result(energy)
  do ip=1,nbk
    e1 = e1+two*n(ip)*h1(ip)
    do iq=1,nbk
-     fx = jk_exchange(func,n(ip),n(iq),ip==iq,weak(ip),weak(iq),alpha)
+     fx = jk_exchange(func,n(ip),n(iq),ip==iq,alpha)
      fh = n(ip)*n(iq)
      if (func == RDMFT_MULLER_AS) fh = fx
      e2 = e2+two*fh*jint(ip,iq)-fx*kint(ip,iq)

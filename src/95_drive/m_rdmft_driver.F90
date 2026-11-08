@@ -34,9 +34,10 @@ module m_rdmft_driver
  use m_nctk,             only : nctk_try_fort_or_ncfile
  use m_rdmft,            only : rdmft_hello
  use m_pawfgr,           only : pawfgr_type, pawfgr_init, pawfgr_destroy
- use m_rdmft_functionals, only : RDMFT_SD, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_active_space, &
+ use m_rdmft_functionals, only : RDMFT_SD, RDMFT_POWER, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_active_space, &
                                  rdmft_energy_jk, rdmft_energy_pnof, rdmft_functional_name, rdmft_pnof_table_t
  use m_rdmft_hamiltonian, only : rdmft_one_electron
+ use m_rdmft_optimizer,   only : rdmft_optimize_jk
  use m_rdmft_integrals,  only : rdmft_ints_t
  use m_rdmft_orbitals,   only : rdmft_orbs_t
  use m_specialmsg,       only : wrtout
@@ -95,9 +96,11 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  type(pawfgr_type) :: pawfgr
  type(rdmft_ints_t) :: ints
  type(rdmft_pnof_table_t) :: table
- integer :: ierr2,ifunc,nbk,nocc_k
- integer,allocatable :: bandc(:),noccb(:)
- real(dp),allocatable :: eigc(:),h1c(:),nc(:)
+ integer :: ierr2,ifunc,nbk,nocc_k,niter
+ integer,allocatable :: bandc(:),noccb(:),partner(:)
+ logical :: conv
+ real(dp) :: eopt,kt(3)
+ real(dp),allocatable :: eigc(:),h1c(:),nc(:),nfix(:),nopt(:)
  logical,allocatable :: actc(:),occd(:)
  type(rdmft_orbs_t) :: orbs
  !arrays
@@ -212,7 +215,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    dtset%rdmft_selfint,'; total energy, difference with SD):'
  call wrtout([ab_out,std_out],msg)
  do ifunc=RDMFT_SD,RDMFT_MULLER_AS
-   eone = rdmft_energy_jk(ifunc,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint,.not.occd,0.6_dp)+e_ewald+e_corepsp
+   eone = rdmft_energy_jk(ifunc,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint,0.6_dp)+e_ewald+e_corepsp
    write(msg,'(2a,es22.14,a,es10.2)') '   ',rdmft_functional_name(ifunc),eone,'  diff =',eone-etot
    call wrtout([ab_out,std_out],msg)
  end do
@@ -234,6 +237,50 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
        ')',eone,'  diff =',eone-etot
      call wrtout([ab_out,std_out],msg)
    end do
+ end if
+
+ ! Optimization of the occupation numbers (JK-only functionals) for the fixed orbitals
+ if (dtset%rdmft_functional >= RDMFT_SD .and. dtset%rdmft_functional <= RDMFT_MULLER_AS) then
+   if (dtset%rdmft_functional == RDMFT_POWER) then
+     ABI_ERROR('RDMFT: the POWER functional is not yet available for the optimization (its exponent has no input variable).')
+   end if
+   ! Time-reversal partner (n,-k) of each orbital, which shares its occupation. If -k is not in the mesh
+   ! the orbital has no partner (it is its own): the geminal (k up, -k down) only needs the integrals of the mesh
+   ! points, since J and K of the conjugate orbital at -k are those of the orbital at k.
+   ABI_MALLOC(partner,(nbk))
+   do ik=1,orbs%nkpt
+     jk = ik
+     do ib=1,orbs%nkpt
+       kt(:) = orbs%kpt(:,ik)+orbs%kpt(:,ib)
+       if (maxval(abs(kt(:)-anint(kt(:)))) < 1.0e-6_dp) jk = ib
+     end do
+     do ib=1,orbs%nband(ik,1)
+       partner(ints%offset(ik)+ib) = ints%offset(jk)+ib
+     end do
+   end do
+   ABI_MALLOC(nfix,(nbk))
+   ABI_MALLOC(nopt,(nbk))
+   nfix = zero
+   where (occd) nfix = one
+   call rdmft_optimize_jk(dtset%rdmft_functional,orbs%nkpt,nbk,h1c,ints%jint,ints%kint,0.6_dp,partner,actc,nfix,&
+                          orbs%nelect/two*orbs%nkpt-real(count(occd.and..not.actc),dp),1.0e-6_dp,nopt,eopt,conv,niter)
+   write(msg,'(2a,a,i0,a,l1,3a,es22.14,a,es22.14,a,es10.2,a)') ch10,' RDMFT: occupation numbers optimized for the ',&
+     'functional ',dtset%rdmft_functional,' (converged = ',conv,')',ch10,&
+     ' RDMFT: optimized total energy         = ',eopt+e_ewald+e_corepsp,&
+     '; energy with the ground-state occupations = ',etot,'  (optimized - ground state =',eopt+e_ewald+e_corepsp-etot,')'
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,i0,a,es14.6)') ' RDMFT: number of SQP iterations = ',niter,'; sum of occupations (per k-point) = ',&
+     sum(nopt)/orbs%nkpt
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a)') ' RDMFT: occupation numbers of the first k-point (band, energy, n):'
+   call wrtout([ab_out,std_out],msg)
+   do ib=1,orbs%nband(1,1)
+     write(msg,'(i6,f14.6,f16.10)') ib,eigc(ints%offset(1)+ib),nopt(ints%offset(1)+ib)
+     call wrtout([ab_out,std_out],msg)
+   end do
+   ABI_FREE(partner)
+   ABI_FREE(nfix)
+   ABI_FREE(nopt)
  end if
  call table%free()
  ABI_FREE(nc)

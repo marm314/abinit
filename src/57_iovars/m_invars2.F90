@@ -2273,6 +2273,9 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_ecut_act',tread,'ENE')
  if(tread==1) dtset%rdmft_ecut_act=dprarr(1)
 
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_functional',tread,'INT')
+ if(tread==1) dtset%rdmft_functional=intarr(1)
+
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_ncoupl',tread,'INT')
  if(tread==1) dtset%rdmft_ncoupl=intarr(1)
 
