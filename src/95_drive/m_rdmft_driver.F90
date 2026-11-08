@@ -29,6 +29,8 @@ module m_rdmft_driver
  use m_fstrings,         only : sjoin, ftoa
  use m_nctk,             only : nctk_try_fort_or_ncfile
  use m_rdmft,            only : rdmft_hello
+ use m_pawfgr,           only : pawfgr_type, pawfgr_init, pawfgr_destroy
+ use m_rdmft_integrals,  only : rdmft_ints_t
  use m_rdmft_orbitals,   only : rdmft_orbs_t
  use m_specialmsg,       only : wrtout
 
@@ -72,11 +74,16 @@ subroutine rdmft_driver(codvsn,dtfil,dtset)
  !Local variables-------------------------------
  !scalars
  integer,parameter :: master=0
- integer :: ierr
- real(dp) :: maxdev
+ integer :: ierr,ik,iq,ip,jb,jk,ib,mgfftf,nfftf
+ real(dp) :: ecut_eff,ecutdg_eff,ehartree,eexch,gsqcutc_eff,gsqcutf_eff,maxdev,np,nq
  character(len=500) :: msg
  character(len=fnlen) :: wfk_path
+ type(pawfgr_type) :: pawfgr
+ type(rdmft_ints_t) :: ints
  type(rdmft_orbs_t) :: orbs
+ !arrays
+ integer :: ngfftc(18),ngfftf(18)
+ real(dp),parameter :: k0(3)=zero
 
 ! *************************************************************************
 
@@ -103,6 +110,39 @@ subroutine rdmft_driver(codvsn,dtfil,dtset)
  write(msg,'(2a,es12.4,a)') ch10,' RDMFT: maximum deviation from orthonormality of the orbitals = ',maxdev,ch10
  call wrtout([ab_out,std_out],msg)
 
+ !FFT mesh and G^2 cut-off containing the products of two orbitals (same as for the density)
+ call pawfgr_init(pawfgr,dtset,mgfftf,nfftf,ecut_eff,ecutdg_eff,ngfftc,ngfftf, &
+                  gsqcutc_eff=gsqcutc_eff,gsqcutf_eff=gsqcutf_eff,gmet=orbs%gmet,k0=k0)
+
+ !J and K integrals between all the orbitals of the full BZ
+ call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut)
+
+ !Hartree and exchange energies per unit cell with the occupations of the ground-state calculation
+ ehartree = zero
+ eexch = zero
+ do ik=1,orbs%nkpt
+   do ib=1,orbs%nband(ik,1)
+     ip = ints%offset(ik)+ib
+     np = orbs%occ(ib,ik,1)/two   ! occupation per spin
+     do jk=1,orbs%nkpt
+       do jb=1,orbs%nband(jk,1)
+         iq = ints%offset(jk)+jb
+         nq = orbs%occ(jb,jk,1)/two
+         ehartree = ehartree+two*np*nq*ints%jint(ip,iq)
+         eexch = eexch-np*nq*ints%kint(ip,iq)
+       end do
+     end do
+   end do
+ end do
+ ehartree = ehartree/orbs%nkpt**2
+ eexch = eexch/orbs%nkpt**2
+ write(msg,'(2a,es22.14,a,es22.14,2a)') ch10,' RDMFT: Hartree energy (ground-state occupations) = ',ehartree,&
+   ' Ha, exchange energy = ',eexch,' Ha',ch10
+ call wrtout([ab_out,std_out],msg)
+
+
+ call ints%free()
+ call pawfgr_destroy(pawfgr)
  call orbs%free()
 
 end subroutine rdmft_driver

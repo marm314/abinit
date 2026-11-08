@@ -3,6 +3,7 @@
 #
 add_library(81_rdmft STATIC
   m_rdmft.F90
+  m_rdmft_integrals.F90
   m_rdmft_orbitals.F90
   )
 

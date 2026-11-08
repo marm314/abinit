@@ -31,6 +31,7 @@ module m_rdmft_orbitals
  use m_hdr
  use m_wfk
 
+ use m_geometry,   only : metric
  use m_io_tools,   only : iomode_from_fname, get_unit
  use m_specialmsg, only : wrtout
 
@@ -67,6 +68,15 @@ module m_rdmft_orbitals
 
    real(dp) :: nelect = zero
    ! Number of electrons.
+
+   real(dp) :: ucvol = zero
+   ! Volume of the unit cell (Bohr^3).
+
+   real(dp) :: rprimd(3,3) = zero
+   ! Real space primitive translations (Bohr).
+
+   real(dp) :: gmet(3,3) = zero
+   ! Metric tensor in reciprocal space (Bohr^-2).
 
    integer,allocatable :: nband(:,:)
    ! nband(nkpt,nsppol)
@@ -148,6 +158,9 @@ subroutine rdmft_orbs_free(orbs)
  orbs%mband = 0
  orbs%mpw = 0
  orbs%nelect = zero
+ orbs%ucvol = zero
+ orbs%rprimd = zero
+ orbs%gmet = zero
 
 end subroutine rdmft_orbs_free
 !!***
@@ -183,6 +196,7 @@ subroutine rdmft_orbs_read_wfk(orbs,wfk_path)
  !arrays
  integer :: band_block(2)
  integer,allocatable :: kg_k(:,:)
+ real(dp) :: gprimd(3,3),rmet(3,3)
  real(dp),allocatable :: cg_k(:,:),eig_k(:),occ_k(:)
 
 ! *************************************************************************
@@ -210,6 +224,8 @@ subroutine rdmft_orbs_read_wfk(orbs,wfk_path)
  orbs%mband = maxval(hdr%nband)
  orbs%mpw = maxval(hdr%npwarr)
  orbs%nelect = hdr%nelect
+ orbs%rprimd(:,:) = hdr%rprimd(:,:)
+ call metric(orbs%gmet,gprimd,-1,rmet,orbs%rprimd,orbs%ucvol)
 
  ABI_MALLOC(orbs%nband,(orbs%nkpt,orbs%nsppol))
  ABI_MALLOC(orbs%npw,(orbs%nkpt))
