@@ -407,6 +407,7 @@ module defs_basis
  integer, parameter, public :: RUNL_GWLS       = 66
  integer, parameter, public :: RUNL_BSE        = 99
  integer, parameter, public :: RUNL_LONGWAVE   = 10
+ integer, parameter, public :: RUNL_RDMFT      = 11
 
  ! Integer flags defining the task to be performed in wfk_analyze
  integer,public,parameter :: WFK_TASK_NONE      = 0

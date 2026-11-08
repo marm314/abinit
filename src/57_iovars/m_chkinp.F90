@@ -3028,9 +3028,9 @@ subroutine chkinp(dtsets, iout, mpi_enregs, ndtset, ndtset_alloc, npsp, pspheads
    end if
 
 !  Check the value of optdriver
-   call chkint_eq(0, 0, cond_string, cond_values, ierr, 'optdriver', optdriver, 12,&
+   call chkint_eq(0, 0, cond_string, cond_values, ierr, 'optdriver', optdriver, 13,&
                   [RUNL_GSTATE,RUNL_RESPFN,RUNL_SCREENING,RUNL_SIGMA,RUNL_NONLINEAR,RUNL_GWR, RUNL_BSE, &
-                   RUNL_GWLS, RUNL_WFK,RUNL_EPH,RUNL_LONGWAVE,RUNL_RTTDDFT], iout)
+                   RUNL_GWLS, RUNL_WFK,RUNL_EPH,RUNL_LONGWAVE,RUNL_RTTDDFT,RUNL_RDMFT], iout)
 
    if (response==1.and.all(dt%optdriver/=[RUNL_RESPFN,RUNL_NONLINEAR,RUNL_LONGWAVE])) then
      write(msg,'(a,i3,3a,13(a,i2),4a)' )&

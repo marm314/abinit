@@ -22,6 +22,7 @@ add_library(95_drive STATIC
   m_multibinit_driver.F90
   m_nonlinear.F90
   m_precpred_1geo.F90
+  m_rdmft_driver.F90
   m_respfn_driver.F90
   m_rttddft_driver.F90
   m_pead_nl_loop.F90
@@ -68,6 +69,7 @@ target_link_libraries(95_drive
   abinit::79_seqpar_mpi
   abinit::80_rttddft
   abinit::80_tdep
+  abinit::81_rdmft
   abinit::94_scfcv
   )
 

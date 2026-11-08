@@ -165,6 +165,7 @@ add_library(abinit_lib STATIC
   $<TARGET_OBJECTS:79_seqpar_mpi>
   $<TARGET_OBJECTS:80_rttddft>
   $<TARGET_OBJECTS:80_tdep>
+  $<TARGET_OBJECTS:81_rdmft>
   $<TARGET_OBJECTS:94_scfcv>
   $<TARGET_OBJECTS:95_drive>
   )

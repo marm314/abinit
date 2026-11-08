@@ -70,6 +70,7 @@ module m_driver
  use m_nonlinear,        only : nonlinear
  use m_drivexc,          only : echo_xc_name
  use m_rttddft_driver,   only : rttddft
+ use m_rdmft_driver,     only : rdmft_driver
 
 #if defined HAVE_BIGDFT
  use BigDFT_API,   only: xc_init, xc_end, XC_MIXED, XC_ABINIT,&
@@ -352,6 +353,9 @@ subroutine driver(codvsn,cpui,dtsets,filnam,filstat,&
        call ydoc%add_ints("optdriver", [dtset%optdriver], dict_key="meta")
 
      case (RUNL_RTTDDFT)
+       call ydoc%add_ints("optdriver", [dtset%optdriver], dict_key="meta")
+
+     case (RUNL_RDMFT)
        call ydoc%add_ints("optdriver", [dtset%optdriver], dict_key="meta")
 
      case default
@@ -826,6 +830,9 @@ subroutine driver(codvsn,cpui,dtsets,filnam,filstat,&
 
    case (RUNL_RTTDDFT)
      call rttddft(codvsn,dtfil,dtset,mpi_enregs(idtset),pawang,pawrad,pawtab,psps)
+
+   case (RUNL_RDMFT)
+     call rdmft_driver(codvsn)
 
    case default
      write(msg,'(a,i0,4a)')&

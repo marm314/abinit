@@ -15900,6 +15900,7 @@ The choice is among:
   * 8 --> Post-processing of WFK file, routine *wfk_analyze*. See also [[wfk_task]] input variable.
   * 9 --> Real-time TDDDFT calculation (RTTDDFT), routine *rttddft_driver*
   * 10 --> Spatial (LONGWAVE) and time (TIMDISP) dispersion, routine *longwave*. See also [[lw_flexo]],  [[lw_qdrpl]] , [[lw_natopt]] or [[timdisp]] input variables.
+  * 11 --> Reduced Density Matrix Functional Theory calculation (RDMFT), routine *rdmft_driver*
   * 66 --> GW using Lanczos-Sternheimer, see input variables whose name start with `gwls_*`.
   * 99 --> Bethe-Salpeter calculation (BSE), routine *bethe_salpeter*
 
