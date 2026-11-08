@@ -1471,6 +1471,10 @@ subroutine chkinp(dtsets, iout, mpi_enregs, ndtset, ndtset_alloc, npsp, pspheads
    call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_selfint',dt%rdmft_selfint,2,[0,1],iout)
    call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_functional',dt%rdmft_functional,15,&
 &   [0,1,2,3,4,5,6,7,8,9,10,21,22,23,24],iout)
+   call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_core_ints',dt%rdmft_core_ints,2,[0,1],iout)
+   call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_restart',dt%rdmft_restart,2,[0,1],iout)
+   call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_start',dt%rdmft_start,2,[0,1],iout)
+   call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_power',dt%rdmft_power,1,tol8,iout)
    call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_ncoupl',dt%rdmft_ncoupl,2,iout)
    call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_nocc_act',dt%rdmft_nocc_act,0,iout)
    call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_nvir_act',dt%rdmft_nvir_act,0,iout)

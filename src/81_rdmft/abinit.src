@@ -18,7 +18,6 @@ ABI_SRC_DEP = 2     # The file depends on other files
 
 # Source files
 sources = [
-"m_rdmft.F90",
 "m_rdmft_functionals.F90",
 "m_rdmft_hamiltonian.F90",
 "m_rdmft_integrals.F90",

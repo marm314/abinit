@@ -31,8 +31,8 @@ module m_rdmft_optimizer
  use m_abicore
  use m_errors
 
- use m_rdmft_functionals, only : rdmft_energy_jk, rdmft_energy_pnof, rdmft_grad_pnof, rdmft_jk_diag, rdmft_jk_pair, &
-                                 rdmft_pnof_occ, rdmft_pnof_table_t
+ use m_rdmft_functionals, only : rdmft_bg_t, rdmft_energy_jk, rdmft_energy_pnof, rdmft_grad_pnof, rdmft_jk_diag, &
+                                 rdmft_jk_pair, rdmft_pnof_gamma, rdmft_pnof_occ, rdmft_pnof_table_t
  use m_specialmsg,        only : wrtout
 
  implicit none
@@ -341,13 +341,13 @@ end subroutine qp_box_eq
 !! INPUTS
 !!  func = JK-only functional
 !!  nk = number of k-points of the full BZ
-!!  nbk = number of orbitals (composite index)
+!!  nbk = number of free orbitals (all of them are variables)
 !!  h1(nbk), jint(nbk,nbk), kint(nbk,nbk) = core Hamiltonian diagonal, J and K integrals
 !!  alpha = exponent of the POWER functional
 !!  partner(nbk) = time-reversal partner of each orbital (itself for the time-reversal-invariant k-points)
-!!  active(nbk) = true for the active orbitals
-!!  nfix(nbk) = occupations of the frozen orbitals (1 or 0)
-!!  ntarget = sum of the occupations of the active orbitals
+!!  n0(nbk) = starting occupations
+!!  ntarget = sum of the occupations of the free orbitals
+!!  bj(nbk), bk(nbk), bg = background orbitals (frozen occupied): sums of the integrals and constants
 !!  eps = the occupations are kept in [eps,1-eps]
 !!
 !! OUTPUT
@@ -356,21 +356,21 @@ end subroutine qp_box_eq
 !!  converged, niter
 !!
 !! SOURCE
-subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,active,nfix,ntarget,eps,&
+subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,n0,ntarget,eps,bj,bk,bg,&
                              nout,energy,converged,niter)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func,nk,nbk
  real(dp),intent(in) :: alpha,ntarget,eps
+ type(rdmft_bg_t),intent(in) :: bg
  real(dp),intent(out) :: energy
  logical,intent(out) :: converged
  integer,intent(out) :: niter
  !arrays
  integer,intent(in) :: partner(nbk)
- real(dp),intent(in) :: h1(nbk),jint(nbk,nbk),kint(nbk,nbk),nfix(nbk)
+ real(dp),intent(in) :: h1(nbk),jint(nbk,nbk),kint(nbk,nbk),n0(nbk),bj(nbk),bk(nbk)
  real(dp),intent(out) :: nout(nbk)
- logical,intent(in) :: active(nbk)
 
  !Local variables-------------------------------
  !scalars
@@ -386,16 +386,12 @@ subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,active,nfix,
 
 ! *************************************************************************
 
- ! Variables: one per active orbital, shared with the time-reversal partner
+ ! Variables: one per orbital, shared with the time-reversal partner
  ABI_MALLOC(var_of,(nbk))
  var_of = 0
  nv = 0
  do ip=1,nbk
-   if (.not.active(ip)) cycle
    if (var_of(ip) /= 0) cycle
-   if (.not.active(partner(ip))) then
-     ABI_ERROR('RDMFT: the active window is not closed under k -> -k.')
-   end if
    nv = nv+1
    var_of(ip) = nv
    var_of(partner(ip)) = nv
@@ -422,7 +418,7 @@ subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,active,nfix,
 
  ! Starting point: aufbau occupations moved into the interior of the box, keeping the sum
  do ip=1,nbk
-   if (var_of(ip) > 0) x(var_of(ip)) = nfix(ip)
+   x(var_of(ip)) = n0(ip)
  end do
  x = min(one-eps,max(eps,x))
  resid = ntarget-sum(aeq*x)
@@ -515,18 +511,14 @@ contains
    real(dp),intent(out) :: nfull(nbk)
    integer :: jp
    do jp=1,nbk
-     if (var_of(jp) > 0) then
-       nfull(jp) = xv(var_of(jp))
-     else
-       nfull(jp) = nfix(jp)
-     end if
+     nfull(jp) = xv(var_of(jp))
    end do
  end subroutine expand
 
  function evalue(nfull) result(e)
    real(dp),intent(in) :: nfull(nbk)
    real(dp) :: e
-   e = rdmft_energy_jk(func,nk,nbk,nfull,h1,jint,kint,alpha)
+   e = rdmft_energy_jk(func,nk,nbk,nfull,h1,jint,kint,alpha,bj,bk,bg)
  end function evalue
 
  subroutine gradient_hessian(nfull,gx,hx)
@@ -541,14 +533,17 @@ contains
    gsum = zero
    hdiag = zero
    do jp=1,nbk
-     if (.not.active(jp)) cycle
      do jq=1,nbk
        if (jq == jp) cycle
        call rdmft_jk_pair(func,nfull(jp),nfull(jq),jint(jp,jq),kint(jp,jq),alpha,ff,fa,faa,fab)
        gsum(jp) = gsum(jp)+two*fa
        hdiag(jp) = hdiag(jp)+two*faa
-       if (active(jq)) hx(var_of(jp),var_of(jq)) = hx(var_of(jp),var_of(jq))+two*fab/nk2
+       hx(var_of(jp),var_of(jq)) = hx(var_of(jp),var_of(jq))+two*fab/nk2
      end do
+     ! Interaction with the background orbitals (occupation 1)
+     call rdmft_jk_pair(func,nfull(jp),one,bj(jp),bk(jp),alpha,ff,fa,faa,fab)
+     gsum(jp) = gsum(jp)+two*fa
+     hdiag(jp) = hdiag(jp)+two*faa
      call rdmft_jk_diag(func,nfull(jp),jint(jp,jp),kint(jp,jp),alpha,fd,fd1,fd2)
      gr = two*h1(jp)/nk+(fd1+gsum(jp))/nk2
      gx(var_of(jp)) = gx(var_of(jp))+gr
@@ -573,7 +568,9 @@ end subroutine rdmft_optimize_jk
 !!  func = PNOF functional
 !!  table <type(rdmft_pnof_table_t)> = pairs, subspaces, classes and variables
 !!  nk, nbk, h1, jint, kint, selfint = as rdmft_energy_pnof
-!!  nfix(nbk) = occupations of the orbitals that are not variables (1 for the frozen occupied orbitals, 0 otherwise)
+!!  bj(nbk), bk(nbk), bg = background orbitals (frozen occupied): sums of the integrals and constants
+!!  use_start, n0(nbk) = if use_start, the angles are those that give the occupations n0 (as closely as possible),
+!!    else all the angles start at pi/4
 !!  gtol = convergence threshold on the largest component of the gradient
 !!  maxit = maximum number of iterations
 !!  check_grad = if true, compare the analytic gradient with finite differences at the start
@@ -584,20 +581,21 @@ end subroutine rdmft_optimize_jk
 !!  converged, niter
 !!
 !! SOURCE
-subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,nfix,gtol,maxit,check_grad,&
+subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,use_start,n0,gtol,maxit,check_grad,&
                                nout,energy,converged,niter)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func,nk,nbk,selfint,maxit
  real(dp),intent(in) :: gtol
- logical,intent(in) :: check_grad
+ logical,intent(in) :: check_grad,use_start
  type(rdmft_pnof_table_t),intent(in) :: table
+ type(rdmft_bg_t),intent(in) :: bg
  real(dp),intent(out) :: energy
  logical,intent(out) :: converged
  integer,intent(out) :: niter
  !arrays
- real(dp),intent(in) :: h1(nbk),jint(nbk,nbk),kint(nbk,nbk),nfix(nbk)
+ real(dp),intent(in) :: h1(nbk),jint(nbk,nbk),kint(nbk,nbk),bj(nbk),bk(nbk),n0(nbk)
  real(dp),intent(out) :: nout(nbk)
 
  !Local variables-------------------------------
@@ -626,6 +624,7 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,nfix,gtol,
  ABI_MALLOC(q,(ngam))
 
  gam = pi4
+ if (use_start) call rdmft_pnof_gamma(table,nbk,n0,gam)
  call eval(gam,f0,g)
 
  if (check_grad) then
@@ -709,7 +708,7 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,nfix,gtol,
  end do
 
  call occupations(gam,nout)
- energy = rdmft_energy_pnof(func,table,nk,nbk,nout,h1,jint,kint,selfint)
+ energy = rdmft_energy_pnof(func,table,nk,nbk,nout,h1,jint,kint,selfint,bj,bk,bg)
 
  ABI_FREE(gam)
  ABI_FREE(g)
@@ -734,7 +733,7 @@ contains
    ABI_MALLOC(nv,(table%nvar))
    ABI_MALLOC(jac,(table%nvar,ngam))
    call rdmft_pnof_occ(table,gv,nv,jac)
-   nfull = nfix
+   nfull = zero
    do jp=1,nbk
      if (table%orb_var(jp) > 0) nfull(jp) = nv(table%orb_var(jp))
    end do
@@ -754,12 +753,12 @@ contains
    ABI_MALLOC(gvar,(table%nvar))
    ABI_MALLOC(nfull,(nbk))
    call rdmft_pnof_occ(table,gv,nv,jac)
-   nfull = nfix
+   nfull = zero
    do jp=1,nbk
      if (table%orb_var(jp) > 0) nfull(jp) = nv(table%orb_var(jp))
    end do
-   e = rdmft_energy_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint)
-   call rdmft_grad_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint,gorb)
+   e = rdmft_energy_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint,bj,bk,bg)
+   call rdmft_grad_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint,bj,bk,gorb)
    gvar = zero
    do jp=1,nbk
      if (table%orb_var(jp) > 0) gvar(table%orb_var(jp)) = gvar(table%orb_var(jp))+gorb(jp)

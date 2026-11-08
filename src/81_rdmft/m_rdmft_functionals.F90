@@ -61,6 +61,30 @@ module m_rdmft_functionals
  ! GNOF: 0.02*sqrt(2)
  real(dp),parameter :: gnof_c = 0.02828427124746190_dp
 
+!!****t* m_rdmft_functionals/rdmft_bg_t
+!! NAME
+!! rdmft_bg_t
+!!
+!! FUNCTION
+!!  Constants of the background orbitals (frozen occupied, occupation 1): their one-electron energy and the sums of
+!!  the Coulomb and exchange integrals over their pairs, which are needed for the total energy only.
+!!
+!! SOURCE
+
+ type,public :: rdmft_bg_t
+
+   real(dp) :: sh = zero
+   ! Sum of h_pp over the background orbitals.
+
+   real(dp) :: sjo = zero, sko = zero
+   ! Sums of J_pq and K_pq over the ordered pairs p/=q of background orbitals.
+
+   real(dp) :: sjd = zero, skd = zero
+   ! Sums of J_pp and K_pp over the background orbitals.
+
+ end type rdmft_bg_t
+!!***
+
 !!****t* m_rdmft_functionals/rdmft_pnof_table_t
 !! NAME
 !! rdmft_pnof_table_t
@@ -128,6 +152,10 @@ module m_rdmft_functionals
 !!***
 
  public :: rdmft_active_space
+ public :: rdmft_energy_bg
+ public :: rdmft_fermi_dirac
+ public :: rdmft_pnof_gamma
+ public :: rdmft_pnof_table_remap
  public :: rdmft_grad_pnof
  public :: rdmft_pnof_occ
  public :: rdmft_jk_diag
@@ -389,6 +417,95 @@ subroutine rdmft_jk_diag(func,n,jv,kv,alpha,fd,fd1,fd2)
 end subroutine rdmft_jk_diag
 !!***
 
+!!****f* m_rdmft_functionals/rdmft_fermi_dirac
+!! NAME
+!!  rdmft_fermi_dirac
+!!
+!! FUNCTION
+!!  Fermi-Dirac occupations n_p = 1/(exp((e_p-mu)/kt)+1) of orbitals with energies eig, with the chemical potential
+!!  mu fixed by bisection so that the sum of the occupations is ntarget (occupations per spin, between 0 and 1).
+!!
+!! OUTPUT
+!!  n(nf) = occupations
+!!  ok = false if ntarget is not in (0,nf)
+!!
+!! SOURCE
+subroutine rdmft_fermi_dirac(nf,eig,ntarget,kt,n,ok)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: nf
+ real(dp),intent(in) :: ntarget,kt
+ logical,intent(out) :: ok
+ !arrays
+ real(dp),intent(in) :: eig(nf)
+ real(dp),intent(out) :: n(nf)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: it
+ real(dp) :: mu,mu_hi,mu_lo,tot
+
+! *************************************************************************
+
+ ok = (ntarget > zero .and. ntarget < real(nf,dp) .and. kt > zero)
+ n = zero
+ if (.not.ok) return
+ mu_lo = minval(eig)-50.0_dp*kt-one
+ mu_hi = maxval(eig)+50.0_dp*kt+one
+ do it=1,200
+   mu = half*(mu_lo+mu_hi)
+   n = one/(exp(max(-200.0_dp,min(200.0_dp,(eig-mu)/kt)))+one)
+   tot = sum(n)
+   if (abs(tot-ntarget) < 1.0e-13_dp*max(one,ntarget)) exit
+   if (tot > ntarget) then
+     mu_hi = mu
+   else
+     mu_lo = mu
+   end if
+ end do
+
+end subroutine rdmft_fermi_dirac
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_energy_bg
+!! NAME
+!!  rdmft_energy_bg
+!!
+!! FUNCTION
+!!  Energy per unit cell of the background orbitals (frozen occupied, n=1): their one-electron energy and the
+!!  Coulomb and exchange energy among them. For the PNOF functionals (func>=RDMFT_PNOF5) these orbitals are trivial
+!!  subspaces; selfint is rdmft_selfint.
+!!
+!! SOURCE
+function rdmft_energy_bg(func,nk,bg,alpha,selfint) result(energy)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func,nk,selfint
+ real(dp),intent(in) :: alpha
+ type(rdmft_bg_t),intent(in) :: bg
+ real(dp) :: energy
+
+ !Local variables-------------------------------
+ !scalars
+ real(dp) :: faa,fab,fa,fdj,fdk,fdj1,fdj2,fdk1,fdk2,ffj,ffk
+
+! *************************************************************************
+
+ if (func >= RDMFT_PNOF5) then
+   energy = two*bg%sh/nk+(two*bg%sjo-bg%sko+(one+real(selfint,dp))*bg%sjd-real(selfint,dp)*bg%skd)/real(nk,dp)**2
+ else
+   call rdmft_jk_pair(func,one,one,one,zero,alpha,ffj,fa,faa,fab)
+   call rdmft_jk_pair(func,one,one,zero,one,alpha,ffk,fa,faa,fab)
+   call rdmft_jk_diag(func,one,one,zero,alpha,fdj,fdj1,fdj2)
+   call rdmft_jk_diag(func,one,zero,one,alpha,fdk,fdk1,fdk2)
+   energy = two*bg%sh/nk+(bg%sjo*ffj+bg%sko*ffk+bg%sjd*fdj+bg%skd*fdk)/real(nk,dp)**2
+ end if
+
+end function rdmft_energy_bg
+!!***
+
 !!****f* m_rdmft_functionals/rdmft_energy_jk
 !! NAME
 !!  rdmft_energy_jk
@@ -403,22 +520,25 @@ end subroutine rdmft_jk_diag
 !!  h1(nbk) = diagonal elements of the core Hamiltonian
 !!  jint(nbk,nbk), kint(nbk,nbk) = J and K integrals (cell-normalized)
 !!  alpha = exponent of the POWER functional
+!!  bj(nbk), bk(nbk) = sums of J_pq and K_pq over the background orbitals q
+!!  bg <type(rdmft_bg_t)> = constants of the background orbitals
 !!
 !! SOURCE
-function rdmft_energy_jk(func,nk,nbk,n,h1,jint,kint,alpha) result(energy)
+function rdmft_energy_jk(func,nk,nbk,n,h1,jint,kint,alpha,bj,bk,bg) result(energy)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func,nk,nbk
  real(dp),intent(in) :: alpha
+ type(rdmft_bg_t),intent(in) :: bg
  real(dp) :: energy
  !arrays
- real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk)
+ real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk),bj(nbk),bk(nbk)
 
  !Local variables-------------------------------
  !scalars
  integer :: ip,iq
- real(dp) :: e1,e2,fh,fx
+ real(dp) :: e1,e2,fa,faa,fab,fh,ff,fx
 
 ! *************************************************************************
 
@@ -432,8 +552,11 @@ function rdmft_energy_jk(func,nk,nbk,n,h1,jint,kint,alpha) result(energy)
      if (func == RDMFT_MULLER_AS) fh = fx
      e2 = e2+two*fh*jint(ip,iq)-fx*kint(ip,iq)
    end do
+   ! Interaction with the background orbitals (occupation 1), counted for the two orders of the pairs
+   call rdmft_jk_pair(func,n(ip),one,bj(ip),bk(ip),alpha,ff,fa,faa,fab)
+   e2 = e2+two*ff
  end do
- energy = e1/nk+e2/real(nk,dp)**2
+ energy = e1/nk+e2/real(nk,dp)**2+rdmft_energy_bg(func,nk,bg,alpha,0)
 
 end function rdmft_energy_jk
 !!***
@@ -562,7 +685,7 @@ end subroutine rdmft_active_space
 !!   - principal orbital p with partner(p)/=p: two mirror subspaces, {p, V_j} and {partner(p), partner(V_j)}, with the
 !!     same occupations; only generic virtual stars (two orbitals) can be used since a time-reversal-invariant
 !!     virtual orbital would belong to both.
-!!  The other occupied orbitals are trivial subspaces (frozen at 1).
+!!  The other occupied orbitals are frozen at 1 (background orbitals, not in the table).
 !!
 !! INPUTS
 !!  nbk = number of orbitals
@@ -721,14 +844,7 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,partner,ncoupl,i
  end do
  table%nvar = nvar
  table%ngam = nc*m
- ! Frozen occupied orbitals: trivial subspaces
- do ip=1,nbk
-   if (occupied(ip) .and. .not.used(ip)) then
-     nsub = nsub+1
-     ng = ng+1
-     table%gem_orb(ng) = ip; table%gem_sub(ng) = nsub; table%gem_principal(ng) = .true.
-   end if
- end do
+ ! The other occupied orbitals are frozen at 1: they are background orbitals and are not in the table
  table%ng = ng
  table%nsub = nsub
 
@@ -737,6 +853,100 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,partner,ncoupl,i
  ABI_FREE(cv)
 
 end subroutine rdmft_pnof_table_build
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_pnof_table_remap
+!! NAME
+!!  rdmft_pnof_table_remap
+!!
+!! FUNCTION
+!!  Change the orbital indices of a table from the composite index (all the orbitals) to the index among the free
+!!  orbitals: free_of(composite) = index (0 if not free).
+!!
+!! SOURCE
+subroutine rdmft_pnof_table_remap(table,nbk,free_of,nfree)
+
+ !Arguments ------------------------------------
+ !scalars
+ type(rdmft_pnof_table_t),intent(inout) :: table
+ integer,intent(in) :: nbk,nfree
+ !arrays
+ integer,intent(in) :: free_of(nbk)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ig,ip
+ !arrays
+ integer,allocatable :: ov(:)
+
+! *************************************************************************
+
+ do ig=1,table%ng
+   if (free_of(table%gem_orb(ig)) == 0) then
+     ABI_BUG('RDMFT: an orbital of the PNOF table is not in the free orbitals.')
+   end if
+   table%gem_orb(ig) = free_of(table%gem_orb(ig))
+ end do
+ ABI_MALLOC(ov,(nfree))
+ ov = 0
+ do ip=1,nbk
+   if (free_of(ip) > 0) ov(free_of(ip)) = table%orb_var(ip)
+ end do
+ call move_alloc(ov,table%orb_var)
+
+end subroutine rdmft_pnof_table_remap
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_pnof_gamma
+!! NAME
+!!  rdmft_pnof_gamma
+!!
+!! FUNCTION
+!!  Angles gamma giving (as closely as the bounds allow) the occupations n(orbital) of the variables of the
+!!  classes: inverse of rdmft_pnof_occ, gamma_0=acos(sqrt(2 n_0-1)), gamma_j=asin(sqrt(y_j/R_{j-1})).
+!!
+!! SOURCE
+subroutine rdmft_pnof_gamma(table,nfree,n,gam)
+
+ !Arguments ------------------------------------
+ !scalars
+ type(rdmft_pnof_table_t),intent(in) :: table
+ integer,intent(in) :: nfree
+ !arrays
+ real(dp),intent(in) :: n(nfree)
+ real(dp),intent(out) :: gam(table%ngam)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ic,ip,j,m,v0,g0
+ real(dp),parameter :: pi4=0.78539816339744830962_dp
+ real(dp) :: rr
+ !arrays
+ real(dp),allocatable :: nv(:)
+
+! *************************************************************************
+
+ ABI_MALLOC(nv,(table%nvar))
+ nv = zero
+ do ip=1,nfree
+   if (table%orb_var(ip) > 0) nv(table%orb_var(ip)) = n(ip)
+ end do
+ gam = pi4
+ g0 = 0
+ do ic=1,table%nclass
+   m = table%class_nvirt(ic)
+   v0 = table%class_var(ic)
+   gam(g0+1) = acos(sqrt(min(one,max(zero,two*nv(v0)-one))))
+   rr = one-nv(v0)
+   do j=1,m-1
+     if (rr > 1.0e-14_dp) gam(g0+1+j) = asin(sqrt(min(one,max(zero,nv(v0+j)*real(table%var_mult(v0+j),dp)/rr))))
+     rr = rr-nv(v0+j)*real(table%var_mult(v0+j),dp)
+   end do
+   g0 = g0+m
+ end do
+ ABI_FREE(nv)
+
+end subroutine rdmft_pnof_gamma
 !!***
 
 !!****f* m_rdmft_functionals/rdmft_pnof_occ
@@ -845,14 +1055,14 @@ end subroutine rdmft_pnof_occ
 !!  grad(nbk) = dE/dn_p (zero for the orbitals that are not in the table)
 !!
 !! SOURCE
-subroutine rdmft_grad_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,grad)
+subroutine rdmft_grad_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,bj,bk,grad)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func,nk,nbk,selfint
  type(rdmft_pnof_table_t),intent(in) :: table
  !arrays
- real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk)
+ real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk),bj(nbk),bk(nbk)
  real(dp),intent(out) :: grad(nbk)
 
  !Local variables-------------------------------
@@ -933,6 +1143,18 @@ subroutine rdmft_grad_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,grad)
        if (viap /= zero) gp(sa) = gp(sa)+two*viap*kint(ip,iq)/nk2
      end if
    end do
+   ! Interaction with the background orbitals (see rdmft_energy_pnof)
+   dpi = zero
+   if (func == RDMFT_GNOF .and. .not.table%gem_principal(ia)) then
+     hpa = hprin(sa)
+     ea = exp(-(hpa/gnof_c)**2)
+     nda = na*ea
+     dnd = one
+     if (nda > tiny_den) dnd = one-half/sqrt(nda)
+     dpi = dnd*ea
+     gp(sa) = gp(sa)+two*dnd*nda*two*hpa/gnof_c**2*bk(ip)/nk2
+   end if
+   grad(ip) = grad(ip)+two*((two*bj(ip)-bk(ip))+dpi*bk(ip))/nk2
  end do
  ! Dependence through the occupation of the principal pair of the subspace (GNOF)
  do ig=1,table%nsub
@@ -962,20 +1184,21 @@ end subroutine rdmft_grad_pnof
 !!  selfint = rdmft_selfint: 0 for the self-interaction free diagonal term n_a J_aa, 1 to add n_a^2 (J_aa-K_aa)
 !!
 !! SOURCE
-function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint) result(energy)
+function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,bj,bk,bg) result(energy)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func,nk,nbk,selfint
  type(rdmft_pnof_table_t),intent(in) :: table
+ type(rdmft_bg_t),intent(in) :: bg
  real(dp) :: energy
  !arrays
- real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk)
+ real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk),bj(nbk),bk(nbk)
 
  !Local variables-------------------------------
  !scalars
  integer :: ia,ib,ig,ip,iq
- real(dp) :: cross,e1,e2,hab,hha,hhb,na,nb,nda,ndb,pi_ab,xab
+ real(dp) :: cross,e1,e2,hab,hha,hhb,na,nb,nda,ndb,pi_ab,pifz,xab
  logical :: same_sub
  !arrays
  real(dp),allocatable :: hprin(:)
@@ -1041,8 +1264,16 @@ function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint) result(ener
      end if
      e2 = e2+hab*jint(ip,iq)-xab*kint(ip,iq)+pi_ab*kint(ip,iq)
    end do
+   ! Interaction with the background orbitals (frozen occupied pairs, n=1, trivial subspaces), for the two orders of
+   ! the pairs. Their Pi term only survives for GNOF and a non-principal pair a.
+   pifz = zero
+   if (func == RDMFT_GNOF .and. .not.table%gem_principal(ia)) then
+     nda = na*exp(-(hprin(table%gem_sub(ia))/gnof_c)**2)
+     pifz = nda-sqrt(max(zero,nda))
+   end if
+   e2 = e2+two*(na*(two*bj(ip)-bk(ip))+pifz*bk(ip))
  end do
- energy = e1/nk+e2/real(nk,dp)**2
+ energy = e1/nk+e2/real(nk,dp)**2+rdmft_energy_bg(func,nk,bg,zero,selfint)
 
  ABI_FREE(hprin)
 

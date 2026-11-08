@@ -19823,6 +19823,63 @@ fixes the initial guess for the Fermi energy.
 ),
 
 Variable(
+    abivarname="rdmft_core_ints",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1,
+    mnemonics="Reduced Density Matrix Functional Theory: compute the integrals among the frozen CORE orbitals",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+In an RDMFT calculation ([[optdriver]] = 11) the frozen occupied orbitals (below the active window, see
+[[rdmft_nocc_act]] and [[rdmft_ecut_act]]) have occupation 1 and only interact with the active orbitals through sums of
+Coulomb and exchange integrals. Their mutual interaction is a constant of the total energy, which needs the exchange
+integrals of all the pairs of frozen orbitals (the cost of an exact-exchange calculation). With **rdmft_core_ints** = 1 this
+constant is computed and the total energies are complete. With 0 it is skipped to save time: the optimization of the
+occupations is not affected, but the printed total energies lack the exchange energy of the frozen orbitals and only
+their differences are meaningful.
+""",
+),
+
+Variable(
+    abivarname="rdmft_power",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1.0,
+    mnemonics="Reduced Density Matrix Functional Theory: exponent of the POWER functional",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Exponent $\alpha$ of the POWER functional ([[rdmft_functional]] = 9), whose exchange function is
+$f(n_p,n_q)=(n_p n_q)^\alpha$. The value 1 is the Hartree-Fock functional and 0.5 the Muller functional.
+""",
+),
+
+Variable(
+    abivarname="rdmft_restart",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: RESTART from occupation numbers",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+If 1, the optimization of the occupation numbers of an RDMFT calculation ([[optdriver]] = 11) starts from the occupations
+read in the file RDMFT_OCC.in of the working directory, instead of the default guess ([[rdmft_start]]). Every RDMFT
+optimization writes at the end the file *_RDMFT_OCC (the root of the output file names), whose format is the one of RDMFT_OCC.in:
+a first line with the number of k-points and of bands, then one line "ik ib n" per orbital with the occupation
+per spin (between 0 and 1). The orbitals that are not in the file keep the occupations of the ground-state calculation.
+For the PNOF functionals the angles of the subspaces are chosen to reproduce the occupations as closely as possible.
+""",
+),
+
+Variable(
     abivarname="rdmft_ecut_act",
     varset="dev",
     vartype="real",
@@ -19873,7 +19930,7 @@ JK-only functionals:
   * 6 --> ML, Marques-Lathiotakis
   * 7 --> MLSIC, Marques-Lathiotakis, self-interaction corrected
   * 8 --> GU, Goedecker-Umrigar
-  * 9 --> POWER (not yet available for the optimization)
+  * 9 --> POWER, exponent [[rdmft_power]]
   * 10 --> MULLER_AS, antisymmetrized Muller (not equal to Hartree-Fock for integer occupations)
 
 PNOF functionals: 21 --> PNOF5, 22 --> PNOF7, 23 --> PNOF7s, 24 --> GNOF. The occupations are parametrized by
@@ -19940,6 +19997,27 @@ Number of active virtual bands of each k-point, counted up from the lowest virtu
 RDMFT calculation ([[optdriver]] = 11). If it is zero the active virtual orbitals are defined by [[rdmft_ecut_act]]
 (all of them if this is zero too). If it is not zero it takes precedence over [[rdmft_ecut_act]]. The PNOF functionals do not
 use this variable: their virtual orbitals are the ones coupled to the principal pairs ([[rdmft_ncoupl]]).
+""",
+),
+
+Variable(
+    abivarname="rdmft_start",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: START guess of the occupation numbers",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Starting occupations of the optimization of an RDMFT calculation ([[optdriver]] = 11), unless [[rdmft_restart]] = 1.
+
+  * 0 --> JK-only functionals: the ground-state occupations (1 for the occupied orbitals, 0 for the others) moved into the
+    interior of the box [1e-6, 1-1e-6] keeping the number of electrons. PNOF functionals: all the angles of the
+    subspaces equal to $\pi/4$.
+  * 1 --> JK-only functionals: Fermi-Dirac occupations of the energies of the active orbitals at the temperature
+    [[tsmear]], with the chemical potential fixed by the number of electrons. Not available for the PNOF functionals.
 """,
 ),
 
