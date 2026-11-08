@@ -3,6 +3,7 @@
 #
 add_library(81_rdmft STATIC
   m_rdmft.F90
+  m_rdmft_orbitals.F90
   )
 
 set_target_properties(81_rdmft
