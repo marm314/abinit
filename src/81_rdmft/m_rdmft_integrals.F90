@@ -231,12 +231,13 @@ end subroutine orbs_to_real
 !!  icutcoul_k, rcut_k = Coulomb cut-off option and radius for K (fock_icutcoul, fock_rcut: as exact exchange)
 !!  free(nbk), bg(nbk) = free and background orbitals (composite index), disjoint
 !!  core_ints = if true compute the exchange constants of the background-background pairs
+!!  quiet = (optional) if true, do not print the summary line
 !!
 !! OUTPUT
 !!  ints
 !!
 !! SOURCE
-subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,free,bg,core_ints)
+subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,free,bg,core_ints,quiet)
 
  !Arguments ------------------------------------
  !scalars
@@ -245,6 +246,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  integer,intent(in) :: icutcoul_j,icutcoul_k
  real(dp),intent(in) :: gsqcut,rcut_j,rcut_k
  logical,intent(in) :: core_ints
+ logical,optional,intent(in) :: quiet
  !arrays
  integer,intent(in) :: ngfft(18)
  logical,intent(in) :: free(:),bg(:)
@@ -421,6 +423,9 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ABI_FREE(vc)
  call destroy_mpi_enreg(mpi_enreg)
 
+ if (present(quiet)) then
+   if (quiet) return
+ end if
  write(msg,'(3a,i0,a,i0,a,i0,2a)') ch10,' RDMFT: J and K integrals computed in the active space,',&
    ' number of free orbitals = ',ints%nfree,', background orbitals = ',ints%nbg,', total orbitals = ',ints%nbk,ch10
  call wrtout([ab_out,std_out],msg)

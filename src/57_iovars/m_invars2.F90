@@ -2270,6 +2270,21 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'bdeigrf',tread,'INT')
  if(tread==1) dtset%bdeigrf=intarr(1)
 
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_check_rot',tread,'INT')
+ if(tread==1) dtset%rdmft_check_rot=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_rot_k',tread,'INT')
+ if(tread==1) dtset%rdmft_rot_k=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_rot_p',tread,'INT')
+ if(tread==1) dtset%rdmft_rot_p=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_rot_q',tread,'INT')
+ if(tread==1) dtset%rdmft_rot_q=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_rot_step',tread,'DPR')
+ if(tread==1) dtset%rdmft_rot_step=dprarr(1)
+
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_core_ints',tread,'INT')
  if(tread==1) dtset%rdmft_core_ints=intarr(1)
 

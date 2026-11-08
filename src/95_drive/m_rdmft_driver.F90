@@ -43,7 +43,7 @@ module m_rdmft_driver
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_integrals,   only : rdmft_ints_t
  use m_rdmft_optimizer,   only : rdmft_optimize_jk, rdmft_optimize_pnof
- use m_rdmft_orbitals,    only : rdmft_orbs_t
+ use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
  use m_specialmsg,        only : wrtout
 
  implicit none
@@ -116,6 +116,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  integer,allocatable :: bandc(:),noccb(:),offset(:),partner(:),partf(:)
  real(dp),parameter :: k0(3)=zero
  real(dp),allocatable :: eigc(:),eigf(:),ekin(:,:),h1c(:),h1diag(:,:),h1f(:),n0(:),nc(:),nfull(:),nf_gs(:),nopt(:)
+ complex(dpc),allocatable :: hmat(:,:,:)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
 
 ! *************************************************************************
@@ -159,7 +160,17 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
                   gsqcutc_eff=gsqcutc_eff,gsqcutf_eff=gsqcutf_eff,gmet=orbs%gmet,k0=k0)
 
  !One-electron part: h_pp with getghc, Ewald and core energies
- call rdmft_one_electron(orbs,dtset,dtfil,gsqcutf_eff,mpi_enreg,pawfgr,pawrad,pawtab,psps,h1diag,ekin,e_ewald,e_corepsp)
+ if (dtset%rdmft_check_rot > 0) then
+   if (.not.(is_jk .or. is_pnof)) then
+     ABI_ERROR('RDMFT: rdmft_check_rot needs rdmft_functional /= 0 (the occupations at which the gradient is checked).')
+   end if
+   if (dtset%rdmft_rot_k > orbs%nkpt) then
+     ABI_ERROR('RDMFT: rdmft_rot_k is larger than the number of k-points.')
+   end if
+   call rdmft_one_electron(orbs,dtset,dtfil,gsqcutf_eff,mpi_enreg,pawfgr,pawrad,pawtab,psps,h1diag,ekin,e_ewald,e_corepsp,hmat)
+ else
+   call rdmft_one_electron(orbs,dtset,dtfil,gsqcutf_eff,mpi_enreg,pawfgr,pawrad,pawtab,psps,h1diag,ekin,e_ewald,e_corepsp)
+ end if
 
  ! ------------------------------------------------------------------
  ! Orbitals with a composite index (band, k-point), active space and free/background sets
@@ -369,6 +380,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      call wrtout([ab_out,std_out],msg)
    end do
    if (xmpi_comm_rank(xmpi_world) == master) call write_occ_file(trim(dtfil%filnam_ds(4))//'_RDMFT_OCC')
+   if (dtset%rdmft_check_rot > 0) call check_rotations(eopt+e_ewald+e_corepsp)
    ABI_FREE(nfull)
    ABI_FREE(n0)
    ABI_FREE(nopt)
@@ -392,6 +404,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ABI_FREE(partf)
  ABI_FREE(h1diag)
  ABI_FREE(ekin)
+ ABI_SFREE(hmat)
  call table%free()
  call ints%free()
  call pawfgr_destroy(pawfgr)
@@ -408,6 +421,122 @@ contains
      if (occf(jf)) dsum = dsum+ints%kint(jf,jf)-ints%jint(jf,jf)
    end do
  end function diag_sum
+
+
+ function energy_rot(orbs_x,h1c_x) result(e)
+   ! Total energy of the functional at the occupations nfull for the orbitals orbs_x (core Hamiltonian diagonal h1c_x)
+   type(rdmft_orbs_t),intent(in) :: orbs_x
+   real(dp),intent(in) :: h1c_x(nbk)
+   real(dp) :: e
+   integer :: jf
+   type(rdmft_ints_t) :: ix
+   type(rdmft_bg_t) :: bx
+   real(dp),allocatable :: h1x(:),nx(:)
+   call ix%compute(orbs_x,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
+                   dtset%rdmft_core_ints == 1,quiet=.true.)
+   ABI_MALLOC(h1x,(nf))
+   ABI_MALLOC(nx,(nf))
+   do jf=1,nf
+     h1x(jf) = h1c_x(ix%comp_of(jf))
+     nx(jf) = nfull(ix%comp_of(jf))
+   end do
+   bx%sh = sum(h1c_x,mask=bg)
+   bx%sjo = ix%sjo; bx%sko = ix%sko; bx%sjd = ix%sjd; bx%skd = ix%skd
+   if (is_jk) then
+     e = rdmft_energy_jk(dtset%rdmft_functional,orbs%nkpt,nf,nx,h1x,ix%jint,ix%kint,alpha,ix%bj,ix%bk,bx)+e_ewald+e_corepsp
+   else
+     e = rdmft_energy_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,nx,h1x,ix%jint,ix%kint,dtset%rdmft_selfint,&
+                           ix%bj,ix%bk,bx)+e_ewald+e_corepsp
+   end if
+   ABI_FREE(h1x)
+   ABI_FREE(nx)
+   call ix%free()
+ end function energy_rot
+
+ subroutine update_h(jk,ib,jb,umat,h1x)
+   ! Diagonal elements of the core Hamiltonian of the rotated bands: h'_pp = sum_ij conjg(U_ip) h_ij U_jp
+   integer,intent(in) :: jk,ib,jb
+   complex(dpc),intent(in) :: umat(2,2)
+   real(dp),intent(inout) :: h1x(nbk)
+   integer :: ic,ii,jj,bnd(2)
+   complex(dpc) :: hl(2,2),acc
+   bnd = [ib,jb]
+   do ii=1,2
+     do jj=1,2
+       hl(ii,jj) = hmat(bnd(ii),bnd(jj),jk)
+     end do
+   end do
+   do ic=1,2
+     acc = czero
+     do ii=1,2
+       do jj=1,2
+         acc = acc+conjg(umat(ii,ic))*hl(ii,jj)*umat(jj,ic)
+       end do
+     end do
+     h1x(offset(jk)+bnd(ic)) = real(acc,dp)
+   end do
+ end subroutine update_h
+
+ function energy_rotated(ik,ib,jb,theta,imag) result(e)
+   ! Energy after rotating the bands ib,jb of the k-point ik by theta (and the time-reversed ones at -k)
+   integer,intent(in) :: ik,ib,jb
+   real(dp),intent(in) :: theta
+   logical,intent(in) :: imag
+   real(dp) :: e
+   integer :: kp
+   complex(dpc) :: umat(2,2)
+   real(dp),allocatable :: h1x(:)
+   type(rdmft_orbs_t) :: ow
+   ow = orbs
+   ABI_MALLOC(h1x,(nbk))
+   h1x = h1c
+   umat = rdmft_rot_matrix(theta,imag,.false.)
+   call ow%rotate_pair(ik,ib,jb,umat)
+   call update_h(ik,ib,jb,umat,h1x)
+   kp = orbs%tr_k(ik)
+   if (kp > 0 .and. kp /= ik) then
+     umat = rdmft_rot_matrix(theta,imag,.true.)
+     call ow%rotate_pair(kp,ib,jb,umat)
+     call update_h(kp,ib,jb,umat,h1x)
+   end if
+   e = energy_rot(ow,h1x)
+   ABI_FREE(h1x)
+   call ow%free()
+ end function energy_rotated
+
+ subroutine check_rotations(e_ref)
+   ! Finite-difference gradient dE/dtheta and curvature of the energy with respect to the rotation of two states of the
+   ! same k-point, at fixed occupations
+   real(dp),intent(in) :: e_ref
+   integer :: ik0,ip_b,iq_b,nb0,ndir
+   real(dp) :: e0,ep,em,step
+   logical :: imag
+   character(len=500) :: cmsg
+   ik0 = dtset%rdmft_rot_k
+   nb0 = orbs%nband(ik0,1)
+   step = dtset%rdmft_rot_step
+   e0 = energy_rot(orbs,h1c)
+   write(cmsg,'(2a,es20.12,a,es10.2,3a,i0,a,es9.2,a)') ch10,' RDMFT: rotation check, E(0) = ',e0,&
+     '  (E(0) - optimized energy =',e0-e_ref,')',ch10,' k-point ',ik0,', step ',step,' radians (central differences)'
+   call wrtout([ab_out,std_out],cmsg)
+   write(cmsg,'(a)') '   band p  band q    n_p       n_q     direction      dE/dtheta        d2E/dtheta2'
+   call wrtout([ab_out,std_out],cmsg)
+   do ip_b=1,nb0
+     do iq_b=ip_b+1,nb0
+       if (dtset%rdmft_check_rot == 1) then
+         if (ip_b /= min(dtset%rdmft_rot_p,dtset%rdmft_rot_q) .or. iq_b /= max(dtset%rdmft_rot_p,dtset%rdmft_rot_q)) cycle
+       end if
+       do ndir=1,2
+         imag = (ndir == 2)
+         ep = energy_rotated(ik0,ip_b,iq_b,step,imag)
+         em = energy_rotated(ik0,ip_b,iq_b,-step,imag)
+         write(cmsg,'(2i8,2f10.6,5x,a,2es18.8)') ip_b,iq_b,nfull(offset(ik0)+ip_b),nfull(offset(ik0)+iq_b),&
+           merge('imaginary','real     ',imag),(ep-em)/(two*step),(ep-two*e0+em)/step**2
+         call wrtout([ab_out,std_out],cmsg)
+       end do
+     end do
+   end do
+ end subroutine check_rotations
 
  subroutine write_occ_file(fname)
    ! File of the occupation numbers per spin of all the orbitals: first line nkpt and nband, then "ik ib n"

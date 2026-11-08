@@ -136,7 +136,13 @@ module m_rdmft_orbitals
    procedure :: complete_time_reversal => rdmft_orbs_complete_time_reversal
    ! Add the missing -k points, with the time-reversed orbitals.
 
+   procedure :: rotate_pair => rdmft_orbs_rotate_pair
+   ! Rotate two bands of one k-point.
+
  end type rdmft_orbs_t
+!!***
+
+ public :: rdmft_rot_matrix
 !!***
 
 contains
@@ -428,6 +434,92 @@ subroutine rdmft_orbs_complete_time_reversal(orbs,nadded)
  nadded = nk1
 
 end subroutine rdmft_orbs_complete_time_reversal
+!!***
+
+!!****f* m_rdmft_orbitals/rdmft_rot_matrix
+!! NAME
+!!  rdmft_rot_matrix
+!!
+!! FUNCTION
+!!  Unitary matrix U = exp(kappa) of a rotation of two orbitals p and q of the same k-point, in the basis (p,q):
+!!   - real direction (imag=.false.): kappa_pq = theta, kappa_qp = -theta, U = [[cos, sin],[-sin, cos]]
+!!   - imaginary direction (imag=.true.): kappa_pq = kappa_qp = i theta, U = [[cos, i sin],[i sin, cos]]
+!!  The rotated orbitals are psi'_j = sum_i psi_i U_ij. With conj_rot, the complex conjugate of U (the rotation of the
+!!  time-reversed orbitals at -k).
+!!
+!! SOURCE
+function rdmft_rot_matrix(theta,imag,conj_rot) result(umat)
+
+ !Arguments ------------------------------------
+ !scalars
+ real(dp),intent(in) :: theta
+ logical,intent(in) :: imag,conj_rot
+ complex(dpc) :: umat(2,2)
+
+ !Local variables-------------------------------
+ !scalars
+ real(dp) :: c,s
+
+! *************************************************************************
+
+ c = cos(theta)
+ s = sin(theta)
+ umat = czero
+ umat(1,1) = cmplx(c,zero,kind=dpc)
+ umat(2,2) = cmplx(c,zero,kind=dpc)
+ if (imag) then
+   umat(1,2) = cmplx(zero,s,kind=dpc)
+   umat(2,1) = cmplx(zero,s,kind=dpc)
+ else
+   umat(1,2) = cmplx(s,zero,kind=dpc)
+   umat(2,1) = cmplx(-s,zero,kind=dpc)
+ end if
+ if (conj_rot) umat = conjg(umat)
+
+end function rdmft_rot_matrix
+!!***
+
+!!****f* m_rdmft_orbitals/rdmft_orbs_rotate_pair
+!! NAME
+!!  rdmft_orbs_rotate_pair
+!!
+!! FUNCTION
+!!  Rotate the bands ib and jb of the k-point ik with the matrix U of rdmft_rot_matrix:
+!!  psi'_ib = U_11 psi_ib + U_21 psi_jb, psi'_jb = U_12 psi_ib + U_22 psi_jb. The rotation mixes only states of
+!!  the same k-point, so the Bloch character is kept.
+!!
+!! INPUTS
+!!  ik, ib, jb = k-point and bands
+!!  umat(2,2) = rotation matrix
+!!
+!! SOURCE
+subroutine rdmft_orbs_rotate_pair(orbs,ik,ib,jb,umat)
+
+ !Arguments ------------------------------------
+ !scalars
+ class(rdmft_orbs_t),intent(inout) :: orbs
+ integer,intent(in) :: ik,ib,jb
+ !arrays
+ complex(dpc),intent(in) :: umat(2,2)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ig,npwso
+ complex(dpc) :: cp,cq
+
+! *************************************************************************
+
+ npwso = orbs%npw(ik)*orbs%nspinor
+ do ig=1,npwso
+   cp = cmplx(orbs%cg(1,ig,ib,ik,1),orbs%cg(2,ig,ib,ik,1),kind=dpc)
+   cq = cmplx(orbs%cg(1,ig,jb,ik,1),orbs%cg(2,ig,jb,ik,1),kind=dpc)
+   orbs%cg(1,ig,ib,ik,1) = real(cp*umat(1,1)+cq*umat(2,1),dp)
+   orbs%cg(2,ig,ib,ik,1) = aimag(cp*umat(1,1)+cq*umat(2,1))
+   orbs%cg(1,ig,jb,ik,1) = real(cp*umat(1,2)+cq*umat(2,2),dp)
+   orbs%cg(2,ig,jb,ik,1) = aimag(cp*umat(1,2)+cq*umat(2,2))
+ end do
+
+end subroutine rdmft_orbs_rotate_pair
 !!***
 
 !!****f* m_rdmft_orbitals/rdmft_orbs_check_orthonormality

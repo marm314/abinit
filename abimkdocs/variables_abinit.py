@@ -19823,6 +19823,102 @@ fixes the initial guess for the Fermi energy.
 ),
 
 Variable(
+    abivarname="rdmft_check_rot",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: CHECK of the ROTation gradient by finite differences",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Numerical check of the gradient of the RDMFT energy with respect to the rotation of the orbitals, at fixed occupation
+numbers (the optimized ones, so [[rdmft_functional]] must be given). Only the states of the same k-point can be rotated.
+The orbitals p and q of the k-point [[rdmft_rot_k]] are mixed by the unitary $U=\exp(\kappa)$ with
+
+  * the real direction, $\kappa_{pq}=-\kappa_{qp}=\theta$ : $\psi'_p=\cos\theta\,\psi_p-\sin\theta\,\psi_q$,
+    $\psi'_q=\sin\theta\,\psi_p+\cos\theta\,\psi_q$,
+  * the imaginary direction, $\kappa_{pq}=\kappa_{qp}=i\theta$ : $\psi'_p=\cos\theta\,\psi_p+i\sin\theta\,\psi_q$,
+    $\psi'_q=i\sin\theta\,\psi_p+\cos\theta\,\psi_q$,
+
+and if the mesh contains $-\mathbf{k}$ the time-reversed orbitals are rotated with $U^*$. The energy is recomputed
+(core Hamiltonian block, J and K integrals of the rotated orbitals, same functional and occupations) at $\pm\theta$ with
+$\theta$ = [[rdmft_rot_step]] and the central-difference gradient $dE/d\theta$ and curvature are printed for both directions.
+For Hartree-Fock orbitals and the SD functional the gradient vanishes (Brillouin theorem), and it vanishes for the
+rotations between two orbitals with the same occupation for every functional.
+The gradient is a complex number, $dE/d\mathrm{Re}\,\kappa_{pq}+i\,dE/d\mathrm{Im}\,\kappa_{pq}$, whose real and imaginary parts are
+the two directions printed. Only its modulus is independent of the phases of the orbitals (the rephasing
+$\psi_q\rightarrow i\psi_q$ exchanges the two directions).
+
+  * 0 --> no check.
+  * 1 --> the pair ([[rdmft_rot_p]], [[rdmft_rot_q]]) of the k-point [[rdmft_rot_k]].
+  * 2 --> all the pairs of bands of the k-point [[rdmft_rot_k]].
+""",
+),
+
+Variable(
+    abivarname="rdmft_rot_k",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1,
+    mnemonics="Reduced Density Matrix Functional Theory: ROTation check, K-point",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Index of the k-point (in the list of the ground-state calculation, completed with the time-reversed points for the PNOF
+functionals) whose orbitals are rotated by [[rdmft_check_rot]].
+""",
+),
+
+Variable(
+    abivarname="rdmft_rot_p",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1,
+    mnemonics="Reduced Density Matrix Functional Theory: ROTation check, band P",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+First band of the rotation checked by [[rdmft_check_rot]] = 1.
+""",
+),
+
+Variable(
+    abivarname="rdmft_rot_q",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=2,
+    mnemonics="Reduced Density Matrix Functional Theory: ROTation check, band Q",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Second band of the rotation checked by [[rdmft_check_rot]] = 1.
+""",
+),
+
+Variable(
+    abivarname="rdmft_rot_step",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0.0001,
+    mnemonics="Reduced Density Matrix Functional Theory: ROTation check, finite-difference STEP",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Rotation angle $\theta$ (radians) of the central finite differences of [[rdmft_check_rot]].
+""",
+),
+
+Variable(
     abivarname="rdmft_core_ints",
     varset="dev",
     vartype="integer",

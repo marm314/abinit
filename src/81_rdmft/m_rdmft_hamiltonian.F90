@@ -84,10 +84,11 @@ contains
 !!  ekin(mband,nkpt) = kinetic part of h1diag
 !!  e_ewald = Ewald energy per unit cell (Hartree)
 !!  e_corepsp = pseudopotential core energy per unit cell (Hartree)
+!!  hmat(mband,mband,nkpt) = (optional) matrix elements <i|h|j> of the core Hamiltonian between the bands of each k-point
 !!
 !! SOURCE
 subroutine rdmft_one_electron(orbs,dtset,dtfil,gsqcut,mpi_enreg,pawfgr,pawrad,pawtab,psps,&
-                              h1diag,ekin,e_ewald,e_corepsp)
+                              h1diag,ekin,e_ewald,e_corepsp,hmat)
 
  !Arguments ------------------------------------
  !scalars
@@ -103,11 +104,12 @@ subroutine rdmft_one_electron(orbs,dtset,dtfil,gsqcut,mpi_enreg,pawfgr,pawrad,pa
  type(pawrad_type),intent(inout) :: pawrad(psps%ntypat*psps%usepaw)
  type(pawtab_type),intent(inout) :: pawtab(psps%ntypat*psps%usepaw)
  real(dp),allocatable,intent(out) :: h1diag(:,:),ekin(:,:)
+ complex(dpc),allocatable,optional,intent(out) :: hmat(:,:,:)
 
  !Local variables-------------------------------
  !scalars
  integer,parameter :: cpopt=0,sij_opt=0,tim_getghc=5,type_calc=0,ider=0,idir=0,dimffnl=1,nkpg=0,option_locl=1
- integer :: ib,ierr,ig,ik,iatom,indx,itypat,n4,n5,n6,nb,nfft,npw_k,psp_gencond
+ integer :: ib,ierr,ig,ik,iatom,indx,itypat,jb,n4,n5,n6,nb,nfft,npw_k,psp_gencond
  real(dp) :: ecore,eei,ucvol,zion
  character(len=500) :: msg
  type(gs_hamiltonian_type) :: ham_k
@@ -201,6 +203,10 @@ subroutine rdmft_one_electron(orbs,dtset,dtfil,gsqcut,mpi_enreg,pawfgr,pawrad,pa
  ABI_MALLOC(ekin,(orbs%mband,orbs%nkpt))
  h1diag = zero
  ekin = zero
+ if (present(hmat)) then
+   ABI_MALLOC(hmat,(orbs%mband,orbs%mband,orbs%nkpt))
+   hmat = czero
+ end if
 
  do ik=1,orbs%nkpt
    nb = orbs%nband(ik,1)
@@ -232,6 +238,17 @@ subroutine rdmft_one_electron(orbs,dtset,dtfil,gsqcut,mpi_enreg,pawfgr,pawrad,pa
    cwavef(:,:) = reshape(orbs%cg(:,1:npw_k,1:nb,ik,1),[2,npw_k*nb])
    call multithreaded_getghc(cpopt,cwavef,cwaveprj,ghc,gsc,ham_k,gvnlxc,one,mpi_enreg,nb,dtset%prtvol,sij_opt,&
                              tim_getghc,type_calc)
+   if (present(hmat)) then
+     do ib=1,nb
+       do jb=1,nb
+         ! <ib|h|jb>
+         hmat(ib,jb,ik) = cmplx(sum(cwavef(1,(ib-1)*npw_k+1:ib*npw_k)*ghc(1,(jb-1)*npw_k+1:jb*npw_k)+ &
+                                    cwavef(2,(ib-1)*npw_k+1:ib*npw_k)*ghc(2,(jb-1)*npw_k+1:jb*npw_k)), &
+                                sum(cwavef(1,(ib-1)*npw_k+1:ib*npw_k)*ghc(2,(jb-1)*npw_k+1:jb*npw_k)- &
+                                    cwavef(2,(ib-1)*npw_k+1:ib*npw_k)*ghc(1,(jb-1)*npw_k+1:jb*npw_k)),kind=dpc)
+       end do
+     end do
+   end if
    do ib=1,nb
      h1diag(ib,ik) = sum(cwavef(:,(ib-1)*npw_k+1:ib*npw_k)*ghc(:,(ib-1)*npw_k+1:ib*npw_k))
      do ig=1,npw_k

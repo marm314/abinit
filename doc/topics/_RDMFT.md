@@ -113,6 +113,17 @@ optdriver4 11  ixc4 40  fock_icutcoul4 3  getwfk4 2  rdmft_functional4 24
 rdmft_nocc_act4 1  rdmft_ncoupl4 2  rdmft_selfint4 1
 ```
 
+## Checking the orbital-rotation gradient numerically
+
+With [[rdmft_check_rot]] the code rotates two states of the same k-point (the rotation of the orbitals can only mix
+states of the same k-point, and the time-reversed orbitals at $-\mathbf{k}$ are rotated with the conjugate matrix),
+recomputes the energy of the functional at the optimized (fixed) occupations, and prints the central-difference
+gradient and curvature with respect to the rotation angle, in the real and the imaginary directions of the
+anti-Hermitian generator. For Hartree-Fock orbitals and the SD functional the gradient vanishes (Brillouin theorem), and
+it vanishes for any functional for two orbitals with the same occupation. The gradient is complex (one real and one
+imaginary direction per pair); only its modulus does not depend on the phases of the orbitals. This is the numerical
+reference to validate an analytic orbital gradient.
+
 ## Present limitations
 
 Norm-conserving pseudopotentials, closed shells ([[nsppol]] = 1, [[nspinor]] = 1), no band or k-point parallelization
