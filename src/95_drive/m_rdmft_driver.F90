@@ -34,6 +34,8 @@ module m_rdmft_driver
  use m_nctk,             only : nctk_try_fort_or_ncfile
  use m_rdmft,            only : rdmft_hello
  use m_pawfgr,           only : pawfgr_type, pawfgr_init, pawfgr_destroy
+ use m_rdmft_functionals, only : RDMFT_SD, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_energy_jk, &
+                                 rdmft_energy_pnof, rdmft_functional_name, rdmft_pnof_table_t
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_integrals,  only : rdmft_ints_t
  use m_rdmft_orbitals,   only : rdmft_orbs_t
@@ -92,6 +94,11 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  character(len=fnlen) :: wfk_path
  type(pawfgr_type) :: pawfgr
  type(rdmft_ints_t) :: ints
+ type(rdmft_pnof_table_t) :: table
+ integer :: ierr2,ifunc,ipair,nbk
+ integer,parameter :: pnof_sub(2)=[1,2],pnof_cpl(2)=[2,3]
+ real(dp),allocatable :: eigc(:),h1c(:),nc(:)
+ logical,allocatable :: occd(:)
  type(rdmft_orbs_t) :: orbs
  !arrays
  integer :: ngfftc(18),ngfftf(18)
@@ -172,6 +179,53 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ch10,' RDMFT: Hartree + exchange                      = ',ehartree+eexch,&
    ch10,' RDMFT: total energy (SD, ground-state occ.)    = ',etot,ch10
  call wrtout([ab_out,std_out],msg)
+
+ !Energies of all the functionals with the ground-state occupations. Except MULLER_AS, the functionals reduce
+ !to the single determinant (Hartree-Fock) energy for integer occupations (up to the fit of ML and MLSIC).
+ nbk = ints%nbk
+ ABI_MALLOC(nc,(nbk))
+ ABI_MALLOC(h1c,(nbk))
+ ABI_MALLOC(eigc,(nbk))
+ ABI_MALLOC(occd,(nbk))
+ do ik=1,orbs%nkpt
+   do ib=1,orbs%nband(ik,1)
+     ip = ints%offset(ik)+ib
+     nc(ip) = orbs%occ(ib,ik,1)/two
+     h1c(ip) = h1diag(ib,ik)
+     eigc(ip) = orbs%eig(ib,ik,1)
+     occd(ip) = (nc(ip) > half)
+   end do
+ end do
+ eexch = zero
+ do ip=1,nbk
+   if (occd(ip)) eexch = eexch+(ints%kint(ip,ip)-ints%jint(ip,ip))
+ end do
+ write(msg,'(2a,es14.6,a)') ch10,' RDMFT: sum over occupied orbitals of (K_pp - J_pp) / N_k^2 = ',eexch/orbs%nkpt**2,' Ha'
+ call wrtout([ab_out,std_out],msg)
+ write(msg,'(2a)') ch10,' RDMFT: functionals evaluated with the ground-state occupations (total energy, difference with SD):'
+ call wrtout([ab_out,std_out],msg)
+ do ifunc=RDMFT_SD,RDMFT_MULLER_AS
+   eone = rdmft_energy_jk(ifunc,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint,.not.occd,0.6_dp)+e_ewald+e_corepsp
+   write(msg,'(2a,es22.14,a,es10.2)') '   ',rdmft_functional_name(ifunc),eone,'  diff =',eone-etot
+   call wrtout([ab_out,std_out],msg)
+ end do
+ do ipair=1,size(pnof_sub)
+   call table%build(nbk,eigc,occd,pnof_sub(ipair),pnof_cpl(ipair),ierr2)
+   if (ierr2 /= 0) cycle
+   do ifunc=RDMFT_PNOF5,RDMFT_GNOF
+     if (ifunc > RDMFT_PNOF5+3) cycle
+     eone = rdmft_energy_pnof(ifunc,table,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint)+e_ewald+e_corepsp
+     write(msg,'(2a,2(a,i0),a,es22.14,a,es10.2)') '   ',rdmft_functional_name(ifunc),' (nsub=',pnof_sub(ipair),&
+       ', coupling=',pnof_cpl(ipair),')',eone,'  diff =',eone-etot
+     call wrtout([ab_out,std_out],msg)
+   end do
+ end do
+ call table%free()
+ ABI_FREE(nc)
+ ABI_FREE(h1c)
+ ABI_FREE(eigc)
+ ABI_FREE(occd)
+
  ABI_FREE(h1diag)
  ABI_FREE(ekin)
 
