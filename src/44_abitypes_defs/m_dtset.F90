@@ -661,6 +661,9 @@ type, public :: dataset_type
 !R
  integer :: random_atpos
  integer :: ratopt
+ integer :: rdmft_ncoupl
+ integer :: rdmft_nocc_act
+ integer :: rdmft_nvir_act
  integer :: rdmft_selfint
  integer :: recgratio
  integer :: recnpath
@@ -997,6 +1000,7 @@ type, public :: dataset_type
  real(dp) :: ratsm
  real(dp) :: ratsph_extra
  real(dp) :: rcpaw_tolnc = tol30
+ real(dp) :: rdmft_ecut_act
  real(dp) :: recrcut
  real(dp) :: recefermi
  real(dp) :: rectolden
@@ -2263,6 +2267,10 @@ type(dataset_type) function dtset_copy(dtin) result(dtout)
  dtout%rcpaw_prtpaw       = dtin%rcpaw_prtpaw
  dtout%rcpaw_tpaw         = dtin%rcpaw_tpaw
  dtout%rcpaw_vhtnzc       = dtin%rcpaw_vhtnzc
+ dtout%rdmft_ecut_act       = dtin%rdmft_ecut_act
+ dtout%rdmft_ncoupl         = dtin%rdmft_ncoupl
+ dtout%rdmft_nocc_act       = dtin%rdmft_nocc_act
+ dtout%rdmft_nvir_act       = dtin%rdmft_nvir_act
  dtout%rdmft_selfint        = dtin%rdmft_selfint
  dtout%recgratio          = dtin%recgratio
  dtout%recnpath           = dtin%recnpath
@@ -4012,7 +4020,7 @@ subroutine chkvars(string)
  list_vars=trim(list_vars)//' random_atpos randomseed ratopt ratsm ratsph ratsph_extra rcut'
  list_vars=trim(list_vars)//' recefermi recgratio recnpath recnrec recptrott recrcut rectesteg rectolden'
 !list_vars=trim(list_vars)//' red_dfield red_efield red_efieldbar restartxf rfasr'
- list_vars=trim(list_vars)//' rdmft_selfint'
+ list_vars=trim(list_vars)//' rdmft_ecut_act rdmft_ncoupl rdmft_nocc_act rdmft_nvir_act rdmft_selfint'
  list_vars=trim(list_vars)//' red_dfield red_efield red_efieldbar restartxf'
  list_vars=trim(list_vars)//' rfatpol rfddk rfdir rfelfd rfeta rfmagn rfmeth rfomega rfphon'
  list_vars=trim(list_vars)//' rfstrs rfstrs_ref rf2_dkdk rf2_dkde rf2_pert1_dir rf2_pert2_dir rhoqpmix rifcsph rprim'

@@ -19823,6 +19823,86 @@ fixes the initial guess for the Fermi energy.
 ),
 
 Variable(
+    abivarname="rdmft_ecut_act",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0.0,
+    mnemonics="Reduced Density Matrix Functional Theory: Energy CUToff of the ACTive orbitals",
+    characteristics=["[[DEVELOP]]", "[[ENERGY]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Energy window of the active orbitals of an RDMFT calculation ([[optdriver]] = 11). The occupied orbitals with an
+energy larger than E_HOMO - **rdmft_ecut_act** are active (E_HOMO is the highest occupied energy over all k-points).
+For the JK-only functionals, the virtual orbitals with an energy smaller than E_LUMO + **rdmft_ecut_act** are also active
+(E_LUMO is the lowest virtual energy over all k-points).
+The occupation numbers of the active orbitals are optimized. The occupied orbitals below the window are frozen at 1
+and the virtual orbitals above it at 0. The orbitals of a degenerate shell on the edge of the window are all active, and
+the window is automatically closed under $\mathbf{k}\rightarrow-\mathbf{k}$.
+
+If **rdmft_ecut_act** is zero, the window is defined by [[rdmft_nocc_act]] and [[rdmft_nvir_act]] or, if these are zero too,
+all the orbitals are active. A non-zero [[rdmft_nocc_act]] ([[rdmft_nvir_act]]) takes precedence over **rdmft_ecut_act**
+for the occupied (virtual) orbitals.
+""",
+),
+
+Variable(
+    abivarname="rdmft_ncoupl",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=2,
+    mnemonics="Reduced Density Matrix Functional Theory: number of pairs COUPLed in a subspace",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Size of the coupling subspaces of the PNOF functionals, in pairs of orbitals: each active occupied orbital (principal pair)
+is coupled with **rdmft_ncoupl** - 1 virtual orbitals. The virtual orbitals are the lowest unused ones over all the
+k-points, so that orbitals of different k-points can share a subspace. The default 2 is the perfect pairing.
+The number of virtual orbitals of the ground-state calculation ([[nband]]) must be large enough. The
+JK-only functionals do not use this variable.
+""",
+),
+
+Variable(
+    abivarname="rdmft_nocc_act",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: Number of OCCupied bands ACTive",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Number of active occupied bands of each k-point, counted down from the highest occupied band, in an RDMFT calculation
+([[optdriver]] = 11). If it is zero the active occupied orbitals are defined by [[rdmft_ecut_act]] (all of them if this
+is zero too). If it is not zero it takes precedence over [[rdmft_ecut_act]]. For the PNOF functionals the active occupied
+orbitals are the principal pairs of the coupling subspaces ([[rdmft_ncoupl]]).
+""",
+),
+
+Variable(
+    abivarname="rdmft_nvir_act",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: Number of VIRtual bands ACTive",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Number of active virtual bands of each k-point, counted up from the lowest virtual band, for the JK-only functionals of an
+RDMFT calculation ([[optdriver]] = 11). If it is zero the active virtual orbitals are defined by [[rdmft_ecut_act]]
+(all of them if this is zero too). If it is not zero it takes precedence over [[rdmft_ecut_act]]. The PNOF functionals do not
+use this variable: their virtual orbitals are the ones coupled to the principal pairs ([[rdmft_ncoupl]]).
+""",
+),
+
+Variable(
     abivarname="rdmft_selfint",
     varset="dev",
     vartype="integer",

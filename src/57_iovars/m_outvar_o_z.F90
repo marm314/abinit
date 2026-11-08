@@ -874,6 +874,18 @@ contains
  dprarr(3,:)=dtsets(:)%red_efieldbar(3)
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,3,narrm,ncid,ndtset_alloc,'red_efieldbar','DPR',0)
 
+ dprarr(1,:)=dtsets(:)%rdmft_ecut_act
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_ecut_act','ENE',0)
+
+ intarr(1,:)=dtsets(:)%rdmft_ncoupl
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_ncoupl','INT',0)
+
+ intarr(1,:)=dtsets(:)%rdmft_nocc_act
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_nocc_act','INT',0)
+
+ intarr(1,:)=dtsets(:)%rdmft_nvir_act
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_nvir_act','INT',0)
+
  intarr(1,:)=dtsets(:)%rdmft_selfint
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_selfint','INT',0)
 

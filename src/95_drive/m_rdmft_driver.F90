@@ -34,8 +34,8 @@ module m_rdmft_driver
  use m_nctk,             only : nctk_try_fort_or_ncfile
  use m_rdmft,            only : rdmft_hello
  use m_pawfgr,           only : pawfgr_type, pawfgr_init, pawfgr_destroy
- use m_rdmft_functionals, only : RDMFT_SD, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_energy_jk, &
-                                 rdmft_energy_pnof, rdmft_functional_name, rdmft_pnof_table_t
+ use m_rdmft_functionals, only : RDMFT_SD, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_active_space, &
+                                 rdmft_energy_jk, rdmft_energy_pnof, rdmft_functional_name, rdmft_pnof_table_t
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_integrals,  only : rdmft_ints_t
  use m_rdmft_orbitals,   only : rdmft_orbs_t
@@ -95,10 +95,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  type(pawfgr_type) :: pawfgr
  type(rdmft_ints_t) :: ints
  type(rdmft_pnof_table_t) :: table
- integer :: ierr2,ifunc,ipair,nbk
- integer,parameter :: pnof_sub(2)=[1,2],pnof_cpl(2)=[2,3]
+ integer :: ierr2,ifunc,nbk,nocc_k
+ integer,allocatable :: bandc(:),noccb(:)
  real(dp),allocatable :: eigc(:),h1c(:),nc(:)
- logical,allocatable :: occd(:)
+ logical,allocatable :: actc(:),occd(:)
  type(rdmft_orbs_t) :: orbs
  !arrays
  integer :: ngfftc(18),ngfftf(18)
@@ -187,9 +187,15 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ABI_MALLOC(h1c,(nbk))
  ABI_MALLOC(eigc,(nbk))
  ABI_MALLOC(occd,(nbk))
+ ABI_MALLOC(actc,(nbk))
+ ABI_MALLOC(bandc,(nbk))
+ ABI_MALLOC(noccb,(nbk))
  do ik=1,orbs%nkpt
+   nocc_k = count(orbs%occ(1:orbs%nband(ik,1),ik,1) > one)
    do ib=1,orbs%nband(ik,1)
      ip = ints%offset(ik)+ib
+     bandc(ip) = ib
+     noccb(ip) = nocc_k
      nc(ip) = orbs%occ(ib,ik,1)/two
      h1c(ip) = h1diag(ib,ik)
      eigc(ip) = orbs%eig(ib,ik,1)
@@ -210,22 +216,33 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    write(msg,'(2a,es22.14,a,es10.2)') '   ',rdmft_functional_name(ifunc),eone,'  diff =',eone-etot
    call wrtout([ab_out,std_out],msg)
  end do
- do ipair=1,size(pnof_sub)
-   call table%build(nbk,eigc,occd,pnof_sub(ipair),pnof_cpl(ipair),ierr2)
-   if (ierr2 /= 0) cycle
+ ! Active space (rdmft_nocc_act, rdmft_nvir_act, rdmft_ecut_act) and PNOF subspaces (rdmft_ncoupl)
+ call rdmft_active_space(nbk,eigc,bandc,noccb,occd,dtset%rdmft_nocc_act,dtset%rdmft_nvir_act,dtset%rdmft_ecut_act,actc)
+ write(msg,'(2a,4(a,i0),a)') ch10,' RDMFT: active space over all k-points: ',' frozen occupied = ',count(occd.and..not.actc),&
+   ', active occupied = ',count(occd.and.actc),', active virtual = ',count(.not.occd.and.actc),&
+   ', frozen virtual = ',count(.not.occd.and..not.actc),ch10
+ call wrtout([ab_out,std_out],msg)
+ call table%build(nbk,eigc,occd,actc,dtset%rdmft_ncoupl,ierr2)
+ if (ierr2 /= 0) then
+   write(msg,'(3a)') ' RDMFT: PNOF functionals skipped: no active occupied orbital or not enough virtual orbitals for',&
+     ' rdmft_ncoupl (increase nband of the ground-state calculation or decrease rdmft_nocc_act/rdmft_ncoupl).',ch10
+   call wrtout([ab_out,std_out],msg)
+ else
    do ifunc=RDMFT_PNOF5,RDMFT_GNOF
-     if (ifunc > RDMFT_PNOF5+3) cycle
      eone = rdmft_energy_pnof(ifunc,table,orbs%nkpt,nbk,nc,h1c,ints%jint,ints%kint,dtset%rdmft_selfint)+e_ewald+e_corepsp
-     write(msg,'(2a,2(a,i0),a,es22.14,a,es10.2)') '   ',rdmft_functional_name(ifunc),' (nsub=',pnof_sub(ipair),&
-       ', coupling=',pnof_cpl(ipair),')',eone,'  diff =',eone-etot
+     write(msg,'(2a,a,i0,a,es22.14,a,es10.2)') '   ',rdmft_functional_name(ifunc),' (rdmft_ncoupl=',dtset%rdmft_ncoupl,&
+       ')',eone,'  diff =',eone-etot
      call wrtout([ab_out,std_out],msg)
    end do
- end do
+ end if
  call table%free()
  ABI_FREE(nc)
  ABI_FREE(h1c)
  ABI_FREE(eigc)
  ABI_FREE(occd)
+ ABI_FREE(actc)
+ ABI_FREE(bandc)
+ ABI_FREE(noccb)
 
  ABI_FREE(h1diag)
  ABI_FREE(ekin)

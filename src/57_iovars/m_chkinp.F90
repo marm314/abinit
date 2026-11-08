@@ -1467,6 +1467,13 @@ subroutine chkinp(dtsets, iout, mpi_enregs, ndtset, ndtset_alloc, npsp, pspheads
    ! fock_icutcoul ! FBruneval: I have forbidden values 1, 2, 4 since they are buggy
    call chkint_eq(0,0,cond_string,cond_values,ierr,'fock_icutcoul',dt%fock_icutcoul,3,[0,3,5],iout)
 
+   ! RDMFT
+   call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_selfint',dt%rdmft_selfint,2,[0,1],iout)
+   call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_ncoupl',dt%rdmft_ncoupl,2,iout)
+   call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_nocc_act',dt%rdmft_nocc_act,0,iout)
+   call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_nvir_act',dt%rdmft_nvir_act,0,iout)
+   call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_ecut_act',dt%rdmft_ecut_act,1,zero,iout)
+
    ! frzfermi
    call chkint_eq(0,0,cond_string,cond_values,ierr,'frzfermi',dt%frzfermi,2,[0,1],iout)
 

@@ -2837,6 +2837,10 @@ subroutine indefo(dtsets, ndtset_alloc, nprocs)
    dtsets(idtset)%rcpaw_sc(:)=two
    dtsets(idtset)%rcpaw_rctypat(:)=1
    dtsets(idtset)%rcut=zero
+   dtsets(idtset)%rdmft_ecut_act=zero
+   dtsets(idtset)%rdmft_ncoupl=2
+   dtsets(idtset)%rdmft_nocc_act=0
+   dtsets(idtset)%rdmft_nvir_act=0
    dtsets(idtset)%rdmft_selfint=0
    dtsets(idtset)%restartxf=0
 !  dtsets(idtset)%rfasr=0

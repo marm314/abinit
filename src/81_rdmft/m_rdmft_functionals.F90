@@ -101,6 +101,7 @@ module m_rdmft_functionals
  end type rdmft_pnof_table_t
 !!***
 
+ public :: rdmft_active_space
  public :: rdmft_energy_jk
  public :: rdmft_energy_pnof
  public :: rdmft_functional_name
@@ -301,43 +302,122 @@ subroutine rdmft_pnof_table_free(table)
 end subroutine rdmft_pnof_table_free
 !!***
 
+!!****f* m_rdmft_functionals/rdmft_active_space
+!! NAME
+!!  rdmft_active_space
+!!
+!! FUNCTION
+!!  Select the active orbitals, whose occupations are optimized. The other occupied orbitals are frozen at 1 and
+!!  the other virtual orbitals at 0.
+!!  Occupied orbitals: if nocc_act>0, the nocc_act highest occupied bands of each k-point; else if ecut_act>0,
+!!  those with an energy larger than E_HOMO-ecut_act; else all of them.
+!!  Virtual orbitals: if nvir_act>0, the nvir_act lowest virtual bands of each k-point; else if ecut_act>0,
+!!  those with an energy smaller than E_LUMO+ecut_act; else all of them.
+!!  Orbitals of a degenerate shell on the edge of an energy window are all kept (tolerance 1e-8 Ha).
+!!
+!! INPUTS
+!!  nbk = number of orbitals (composite index over n and k)
+!!  eig(nbk) = orbital energies
+!!  band(nbk) = band index of each orbital
+!!  nocc_band(nbk) = number of occupied bands of the k-point of each orbital
+!!  occupied(nbk) = true for the occupied orbitals
+!!  nocc_act, nvir_act, ecut_act = rdmft_nocc_act, rdmft_nvir_act, rdmft_ecut_act
+!!
+!! OUTPUT
+!!  active(nbk) = true for the active orbitals
+!!
+!! SOURCE
+subroutine rdmft_active_space(nbk,eig,band,nocc_band,occupied,nocc_act,nvir_act,ecut_act,active)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: nbk,nocc_act,nvir_act
+ real(dp),intent(in) :: ecut_act
+ !arrays
+ integer,intent(in) :: band(nbk),nocc_band(nbk)
+ real(dp),intent(in) :: eig(nbk)
+ logical,intent(in) :: occupied(nbk)
+ logical,intent(out) :: active(nbk)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ip
+ real(dp),parameter :: tol_edge = 1.0e-8_dp
+ real(dp) :: ehomo,elumo
+
+! *************************************************************************
+
+ ehomo = -huge(one)
+ elumo = huge(one)
+ do ip=1,nbk
+   if (occupied(ip)) then
+     ehomo = max(ehomo,eig(ip))
+   else
+     elumo = min(elumo,eig(ip))
+   end if
+ end do
+
+ do ip=1,nbk
+   if (occupied(ip)) then
+     if (nocc_act > 0) then
+       active(ip) = (band(ip) > nocc_band(ip)-nocc_act)
+     else if (ecut_act > zero) then
+       active(ip) = (eig(ip) >= ehomo-ecut_act-tol_edge)
+     else
+       active(ip) = .true.
+     end if
+   else
+     if (nvir_act > 0) then
+       active(ip) = (band(ip) <= nocc_band(ip)+nvir_act)
+     else if (ecut_act > zero) then
+       active(ip) = (eig(ip) <= elumo+ecut_act+tol_edge)
+     else
+       active(ip) = .true.
+     end if
+   end if
+ end do
+
+end subroutine rdmft_active_space
+!!***
+
 !!****f* m_rdmft_functionals/rdmft_pnof_table_build
 !! NAME
 !!  rdmft_pnof_table_build
 !!
 !! FUNCTION
 !!  Build the pairs and subspaces from the orbital energies, over all k-points:
-!!  the nsub highest occupied orbitals are the principal pairs of nsub subspaces, each one coupled with the
-!!  (ncoupl-1) lowest unused virtual orbitals (the first subspace takes the lowest virtuals, and so on). Pairs
-!!  of different k-points can share a subspace. The remaining occupied orbitals are trivial subspaces.
+!!  every active occupied orbital is the principal pair of a subspace, coupled with the (ncoupl-1) lowest unused
+!!  virtual orbitals (the highest principal pair takes the lowest virtuals, and so on). Pairs of different
+!!  k-points can share a subspace. The other occupied orbitals are trivial subspaces (frozen at 1).
 !!  The closure of the subspaces under k -> -k is not enforced here.
 !!
 !! INPUTS
 !!  nbk = number of orbitals
 !!  eig(nbk) = orbital energies
-!!  occupied(nbk) = true for the (strongly) occupied orbitals
-!!  nsub = number of coupling subspaces
+!!  occupied(nbk) = true for the occupied orbitals
+!!  active(nbk) = true for the active orbitals (see rdmft_active_space), only the occupied ones are used here
 !!  ncoupl = number of pairs of each subspace (1 principal + ncoupl-1 virtual)
 !!
 !! OUTPUT
-!!  ierr = 0 if ok, 1 if there are not enough occupied or virtual orbitals
+!!  ierr = 0 if ok, 1 if there are no principal pair or not enough virtual orbitals
 !!
 !! SOURCE
-subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,nsub,ncoupl,ierr)
+subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,ncoupl,ierr)
 
  !Arguments ------------------------------------
  !scalars
  class(rdmft_pnof_table_t),intent(inout) :: table
- integer,intent(in) :: nbk,nsub,ncoupl
+ integer,intent(in) :: nbk,ncoupl
  integer,intent(out) :: ierr
  !arrays
  real(dp),intent(in) :: eig(nbk)
- logical,intent(in) :: occupied(nbk)
+ logical,intent(in) :: occupied(nbk),active(nbk)
 
  !Local variables-------------------------------
  !scalars
- integer :: ip,ig,is,iv,jp,nocc,nvirt
+ integer :: ip,ig,is,iv,jp,nprin,nocc,nvirt
  !arrays
+ integer,allocatable :: prin(:)
  logical,allocatable :: used(:)
 
 ! *************************************************************************
@@ -346,25 +426,27 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,nsub,ncoupl,ierr)
  ierr = 0
  nocc = count(occupied)
  nvirt = nbk-nocc
- if (nsub < 1 .or. ncoupl < 2 .or. nsub > nocc .or. nsub*(ncoupl-1) > nvirt) then
+ nprin = count(occupied .and. active)
+ if (nprin < 1 .or. ncoupl < 2 .or. nprin*(ncoupl-1) > nvirt) then
    ierr = 1
    return
  end if
 
- table%nsub = nocc-nsub+nsub   ! deep occupied (own subspace) + coupling subspaces
- table%ng = nocc+nsub*(ncoupl-1)
+ table%ng = nocc+nprin*(ncoupl-1)
+ table%nsub = nocc
  ABI_MALLOC(table%gem_orb,(table%ng))
  ABI_MALLOC(table%gem_sub,(table%ng))
  ABI_MALLOC(table%gem_principal,(table%ng))
  ABI_MALLOC(used,(nbk))
+ ABI_MALLOC(prin,(nprin))
  used = .false.
 
+ ! Principal pairs: the active occupied orbitals, from the highest energy to the lowest
  ig = 0
- ! Principal pairs: the nsub highest occupied orbitals; subspaces 1..nsub
- do is=1,nsub
+ do is=1,nprin
    jp = 0
    do ip=1,nbk
-     if (occupied(ip) .and. .not.used(ip)) then
+     if (occupied(ip) .and. active(ip) .and. .not.used(ip)) then
        if (jp == 0) then
          jp = ip
        else if (eig(ip) > eig(jp)) then
@@ -373,13 +455,14 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,nsub,ncoupl,ierr)
      end if
    end do
    used(jp) = .true.
+   prin(is) = jp
    ig = ig+1
    table%gem_orb(ig) = jp
    table%gem_sub(ig) = is
    table%gem_principal(ig) = .true.
  end do
  ! Coupled virtual pairs: the lowest unused virtual orbitals, block after block
- do is=1,nsub
+ do is=1,nprin
    do iv=1,ncoupl-1
      jp = 0
      do ip=1,nbk
@@ -398,17 +481,19 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,nsub,ncoupl,ierr)
      table%gem_principal(ig) = .false.
    end do
  end do
- ! Deep occupied orbitals: trivial subspaces
+ ! Frozen occupied orbitals: trivial subspaces
+ is = nprin
  do ip=1,nbk
    if (occupied(ip) .and. .not.used(ip)) then
      ig = ig+1
+     is = is+1
      table%gem_orb(ig) = ip
-     table%gem_sub(ig) = nsub+(ig-nsub*ncoupl)
+     table%gem_sub(ig) = is
      table%gem_principal(ig) = .true.
    end if
  end do
- table%nsub = nsub+(nocc-nsub)
  ABI_FREE(used)
+ ABI_FREE(prin)
 
 end subroutine rdmft_pnof_table_build
 !!***
