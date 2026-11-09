@@ -507,6 +507,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      call orbital_macro(eopt+e_ewald+e_corepsp)
      tst(6) = abi_wtime()-t_start
      eopt = energy_rot(orbs,h1c)-e_ewald-e_corepsp
+     if (is_pnof) call final_pnof_reopt(eopt)
    end if
 
    call print_occupations()
@@ -1530,6 +1531,37 @@ contains
    write(msg,'(4a)') trim(ln(5))//ch10,trim(ln(6))//ch10,trim(ln(7))//ch10,trim(ln(8))
    call wrtout([ab_out,std_out],msg)
  end subroutine print_occupations
+
+ subroutine final_pnof_reopt(e_el)
+   ! PNOF occupations are a non-convex problem: the optimization of the macro-iterations continues from the previous
+   ! occupations (or restarts from all the angles = pi/4), and different starts give different local minima. At the end,
+   ! the occupations of the final orbitals are optimized again from pi/4 and the lower energy is kept.
+   real(dp),intent(inout) :: e_el
+   logical :: conv3
+   integer :: nit3
+   real(dp) :: e_try
+   real(dp),allocatable :: n_try(:),g_try(:)
+   ABI_MALLOC(n_try,(nf))
+   ABI_MALLOC(g_try,(table%ngam))
+   call rdmft_optimize_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,h1f,ints%jint,ints%kint,dtset%rdmft_selfint,&
+                            ints%bj,ints%bk,bgt,.false.,nopt,1.0e-8_dp,500,.false.,n_try,e_try,conv3,nit3,&
+                            verbose=.false.,e_shift=e_ewald+e_corepsp,gam_out=g_try)
+   write(msg,'(2a,es22.14,a,es22.14,a,es10.2,a)') ch10,' RDMFT: final PNOF occupation optimization from all angles = pi/4:',&
+     e_try+e_ewald+e_corepsp,' Ha; current ',e_el+e_ewald+e_corepsp,' Ha; difference ',e_try-e_el,' Ha'
+   call wrtout([ab_out,std_out],msg)
+   if (conv3 .and. e_try < e_el-1.0e-10_dp) then
+     nopt = n_try
+     gam_last = g_try
+     call assemble_nfull()
+     e_el = e_try
+     write(msg,'(a)') ' RDMFT: the occupations of the new minimum are kept (lower energy).'
+   else
+     write(msg,'(a)') ' RDMFT: the current occupations are kept.'
+   end if
+   call wrtout([ab_out,std_out],msg)
+   ABI_FREE(n_try)
+   ABI_FREE(g_try)
+ end subroutine final_pnof_reopt
 
  subroutine write_checkpoint(e_tot)
    ! Checkpoint after a macro-iteration of the orbital optimization (prtwf > 0): WFK and restart files of the current state,

@@ -229,6 +229,10 @@ With [[prtwf]] = 1 the WFK and restart files are also rewritten after every macr
 ([[rdmft_orb_macro]]), so that a job that is interrupted (time limit, crash) can be restarted from the last completed
 macro-iteration. The files are written under a temporary name and then moved, so that they are never left half-written.
 
+For the PNOF functionals with optimized orbitals, the occupations of the final orbitals are optimized once more at the end,
+starting from all the angles equal to $\pi/4$, and the lower energy of the two optimizations is kept (the problem is not
+convex; the output reports both energies).
+
 ## Degenerate states and the choice of the orbitals
 
 The energy of a functional with fractional occupations (MBB, CGA, MLSIC, GU, ...) at **fixed** orbitals is not invariant under
