@@ -940,8 +940,8 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
 
  !Local variables-------------------------------
  !scalars
- integer,parameter :: nhist=10,max_ls=60
- integer :: i,iter,ils,ih,nstored,ngam
+ integer,parameter :: nhist=10,max_ls=60,nstag_max=10
+ integer :: i,iter,ils,ih,nstag,nstored,ngam
  real(dp),parameter :: pi4=0.78539816339744830962_dp,c1=1.0e-4_dp
  real(dp) :: alph,beta,dirder,eshift,f0,ftrial,gamma_scale,sy,yy,fp,fm,step
  logical :: talk
@@ -990,6 +990,7 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
 
  nstored = 0
  ih = 0
+ nstag = 0
  converged = .false.
  niter = 0
  do iter=1,maxit
@@ -1048,9 +1049,25 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
      ymat(:,nstored) = gtrial-g
      rho(nstored) = one/sy
    end if
+   ! Noise floor: the energy no longer decreases (to the precision of its evaluation) although the gradient is above
+   ! gtol, because of the round-off of the energy and of the gradient. The optimization is stopped after nstag_max such
+   ! iterations if the gradient is already small (energy error ~ |g|^2/curvature, far below 1e-12 Ha).
+   if (f0-ftrial <= 1.0e-13_dp*max(one,abs(ftrial))) then
+     nstag = nstag+1
+   else
+     nstag = 0
+   end if
    gam = xtrial
    g = gtrial
    f0 = ftrial
+   if (nstag >= nstag_max .and. maxval(abs(g)) < 1.0e-5_dp) then
+     converged = .true.
+     if (talk) then
+       write(msg,'(a,i5,f20.12,es12.3,a)') '  OCC',iter,f0+eshift,maxval(abs(g)),'  (energy stationary to round-off)'
+       call wrtout([ab_out,std_out],msg)
+     end if
+     exit
+   end if
    if (talk .and. (mod(iter,10) == 1 .or. maxval(abs(g)) < gtol)) then
      write(msg,'(a,i5,f20.12,es12.3)') '  OCC',iter,f0+eshift,maxval(abs(g))
      call wrtout([ab_out,std_out],msg)
