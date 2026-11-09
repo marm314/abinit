@@ -152,6 +152,8 @@ module m_rdmft_functionals
 !!***
 
  public :: rdmft_active_space
+ public :: rdmft_coef_jk
+ public :: rdmft_coef_pnof
  public :: rdmft_energy_bg
  public :: rdmft_fermi_dirac
  public :: rdmft_pnof_gamma
@@ -466,6 +468,122 @@ subroutine rdmft_fermi_dirac(nf,eig,ntarget,kt,n,ok)
  end do
 
 end subroutine rdmft_fermi_dirac
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_coef_jk
+!! NAME
+!!  rdmft_coef_jk
+!!
+!! FUNCTION
+!!  Coefficients of the pair (j,q) in the energy written as
+!!    E = sum_p nu_p h_pp + (1/N_k^2) sum_{pq} [ A_pq J_pq - C_pq K_pq ]
+!!  for a JK-only functional: A = 2 f_H(n_j,n_q), C = f_X(n_j,n_q) (with the special definitions of the diagonal
+!!  pair j=q). They are the input of the orbital gradient (generalized Fock matrix).
+!!
+!! SOURCE
+subroutine rdmft_coef_jk(func,nj,nq,same,alpha,acoef,ccoef)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func
+ real(dp),intent(in) :: nj,nq,alpha
+ logical,intent(in) :: same
+ real(dp),intent(out) :: acoef,ccoef
+
+ !Local variables-------------------------------
+ !scalars
+ real(dp) :: fh,fx
+
+! *************************************************************************
+
+ fx = jk_exchange(func,nj,nq,same,alpha)
+ fh = nj*nq
+ if (func == RDMFT_MULLER_AS) fh = fx
+ acoef = two*fh
+ ccoef = fx
+
+end subroutine rdmft_coef_jk
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_coef_pnof
+!! NAME
+!!  rdmft_coef_pnof
+!!
+!! FUNCTION
+!!  Coefficients A_ab, C_ab of the pair of orbitals (a,b) for a PNOF functional, as rdmft_coef_jk: the energy terms
+!!  H_ab J_ab - X_ab K_ab + Pi_ab K_ab (a/=b) and n_a J_aa + selfint n_a^2 (J_aa-K_aa) (a=b) of rdmft_energy_pnof, so
+!!  that A_ab = H_ab, C_ab = X_ab - Pi_ab, A_aa = n_a + selfint n_a^2, C_aa = selfint n_a^2.
+!!  The background (frozen occupied) orbitals are trivial subspaces with n=1; an orbital that is not in a subspace
+!!  (frozen virtual, n=0) has sub=0 and zero coefficients.
+!!
+!! INPUTS
+!!  func = PNOF functional
+!!  na, nb = occupations
+!!  same_orb = true if a and b are the same orbital
+!!  sub_a, sub_b = subspaces (any different integers for different subspaces)
+!!  prin_a, prin_b = true for a principal pair
+!!  hpa, hpb = 1 - occupation of the principal pair of the subspace of a, b (GNOF)
+!!  selfint = rdmft_selfint
+!!
+!! SOURCE
+subroutine rdmft_coef_pnof(func,na,nb,same_orb,sub_a,sub_b,prin_a,prin_b,hpa,hpb,selfint,acoef,ccoef)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func,sub_a,sub_b,selfint
+ real(dp),intent(in) :: na,nb,hpa,hpb
+ logical,intent(in) :: same_orb,prin_a,prin_b
+ real(dp),intent(out) :: acoef,ccoef
+
+ !Local variables-------------------------------
+ !scalars
+ real(dp) :: cross,hha,hhb,nda,ndb,pi_ab,xab
+ logical :: same_sub
+
+! *************************************************************************
+
+ if (same_orb) then
+   acoef = na+real(selfint,dp)*na**2
+   ccoef = real(selfint,dp)*na**2
+   return
+ end if
+ same_sub = (sub_a == sub_b .and. sub_a /= 0)
+ xab = na*nb
+ if (same_sub) xab = zero
+ hha = one-na
+ hhb = one-nb
+ pi_ab = zero
+ if (same_sub) then
+   pi_ab = sqrt(max(zero,na*nb))
+   if (prin_a .or. prin_b) pi_ab = -pi_ab
+ else
+   select case (func)
+   case (RDMFT_PNOF5)
+     pi_ab = zero
+   case (RDMFT_PNOF7)
+     pi_ab = -sqrt(max(zero,na*nb*hha*hhb))
+   case (RDMFT_PNOF7S)
+     pi_ab = -four*na*nb*hha*hhb
+   case (RDMFT_GNOF)
+     if (.not.(prin_a .and. prin_b)) then
+       nda = na*exp(-(hpa/gnof_c)**2)
+       ndb = nb*exp(-(hpb/gnof_c)**2)
+       cross = sqrt(max(zero,nda*ndb))
+       pi_ab = nda*ndb-sqrt(max(zero,na*nb*hha*hhb))
+       if (prin_a .neqv. prin_b) then
+         pi_ab = pi_ab-cross
+       else
+         pi_ab = pi_ab+cross
+       end if
+     end if
+   case default
+     ABI_ERROR('RDMFT: unknown PNOF functional.')
+   end select
+ end if
+ acoef = two*xab
+ ccoef = xab-pi_ab
+
+end subroutine rdmft_coef_pnof
 !!***
 
 !!****f* m_rdmft_functionals/rdmft_energy_bg

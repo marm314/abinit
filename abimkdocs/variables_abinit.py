@@ -19844,7 +19844,8 @@ The orbitals p and q of the k-point [[rdmft_rot_k]] are mixed by the unitary $U=
 
 and if the mesh contains $-\mathbf{k}$ the time-reversed orbitals are rotated with $U^*$. The energy is recomputed
 (core Hamiltonian block, J and K integrals of the rotated orbitals, same functional and occupations) at $\pm\theta$ with
-$\theta$ = [[rdmft_rot_step]] and the central-difference gradient $dE/d\theta$ and curvature are printed for both directions.
+$\theta$ = [[rdmft_rot_step]] and the central-difference gradient $dE/d\theta$ and curvature are printed for both directions,
+next to the analytic gradient obtained from the generalized Fock matrix of the k-point (and of $-\mathbf{k}$ if it is in the mesh).
 For Hartree-Fock orbitals and the SD functional the gradient vanishes (Brillouin theorem), and it vanishes for the
 rotations between two orbitals with the same occupation for every functional.
 The gradient is a complex number, $dE/d\mathrm{Re}\,\kappa_{pq}+i\,dE/d\mathrm{Im}\,\kappa_{pq}$, whose real and imaginary parts are

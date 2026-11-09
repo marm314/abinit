@@ -129,7 +129,19 @@ gradient and curvature with respect to the rotation angle, in the real and the i
 anti-Hermitian generator. For Hartree-Fock orbitals and the SD functional the gradient vanishes (Brillouin theorem), and
 it vanishes for any functional for two orbitals with the same occupation. The gradient is complex (one real and one
 imaginary direction per pair); only its modulus does not depend on the phases of the orbitals. This is the numerical
-reference to validate an analytic orbital gradient.
+reference to validate the analytic orbital gradient, which is printed next to it.
+
+## Analytic orbital gradient
+
+For the rotation of the orbitals the energy is written with coefficient matrices,
+$E=\sum_p \nu_p h_{pp}+N_k^{-2}\sum_{pq}[A_{pq}J_{pq}-C_{pq}K_{pq}]$, which covers the JK-only functionals
+($A=2f_H$, $C=f_X$) and the PNOF ones, whose self-interaction terms ([[rdmft_selfint]]) are diagonal entries of $A$ and $C$.
+The generalized Fock matrix $F_{pj}$ of a k-point is then built with the plane-wave version of the resolution-of-identity
+contraction: the auxiliary index is the reciprocal vector $\mathbf{G}$, the Hartree part uses the coupling-weighted density
+$W_j(\mathbf{G})=\sum_q a_{jq}\rho_{qq}(\mathbf{G})$ and the pair densities of the states of the same k-point, and the exchange
+part the pair densities of all the bands of the k-point with every orbital $q$ of any k-point. $F$ is block diagonal in k:
+only states of the same k-point are rotated. The gradient of the pair $(p,q)$ is $2\,\mathrm{Re}(F_{pq}-F_{qp}^*)$ in the
+real direction and $-2\,\mathrm{Im}(F_{pq}-F_{qp}^*)$ in the imaginary one.
 
 ## Present limitations
 

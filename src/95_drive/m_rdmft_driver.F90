@@ -37,9 +37,10 @@ module m_rdmft_driver
  use m_pawfgr,            only : pawfgr_type, pawfgr_init, pawfgr_destroy
  use m_pawrad,            only : pawrad_type
  use m_pawtab,            only : pawtab_type
+ use m_rdmft_fock,        only : rdmft_gen_fock_k
  use m_rdmft_functionals, only : RDMFT_SD, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_active_space, rdmft_bg_t, &
-                                 rdmft_energy_jk, rdmft_energy_pnof, rdmft_fermi_dirac, rdmft_functional_name, &
-                                 rdmft_pnof_table_remap, rdmft_pnof_table_t
+                                 rdmft_coef_jk, rdmft_coef_pnof, rdmft_energy_jk, rdmft_energy_pnof, rdmft_fermi_dirac, &
+                                 rdmft_functional_name, rdmft_pnof_table_remap, rdmft_pnof_table_t
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_integrals,   only : rdmft_ints_t
  use m_rdmft_optimizer,   only : rdmft_optimize_jk, rdmft_optimize_pnof
@@ -519,22 +520,99 @@ contains
    call ow%free()
  end function energy_rotated
 
+
+ subroutine build_fock(ikx,fx)
+   ! Generalized Fock matrix (see m_rdmft_fock) of the k-point ikx at the occupations nfull
+   integer,intent(in) :: ikx
+   complex(dpc),intent(out) :: fx(:,:)
+   integer :: jb2,oj,qq,nbx,jsub,jf
+   real(dp) :: ac,cc
+   real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:),hp_c(:)
+   integer,allocatable :: sub_c(:)
+   logical,allocatable :: prin_c(:)
+   nbx = orbs%nband(ikx,1)
+   ABI_MALLOC(acf,(nbx,nbk))
+   ABI_MALLOC(ccf,(nbx,nbk))
+   ABI_MALLOC(nux,(nbx))
+   ABI_MALLOC(sub_c,(nbk))
+   ABI_MALLOC(prin_c,(nbk))
+   ABI_MALLOC(hp_c,(nbk))
+   sub_c = 0; prin_c = .false.; hp_c = one
+   if (is_pnof) then
+     ! subspaces of the table; the background orbitals are trivial subspaces (n=1)
+     do jf=1,table%ng
+       oj = ints%comp_of(table%gem_orb(jf))
+       sub_c(oj) = table%gem_sub(jf)
+       prin_c(oj) = table%gem_principal(jf)
+     end do
+     do jf=1,table%ng
+       oj = ints%comp_of(table%gem_orb(jf))
+       if (prin_c(oj)) then
+         do jsub=1,table%ng
+           if (sub_c(ints%comp_of(table%gem_orb(jsub))) == sub_c(oj)) hp_c(ints%comp_of(table%gem_orb(jsub))) = one-nfull(oj)
+         end do
+       end if
+     end do
+     jsub = table%nsub
+     do qq=1,nbk
+       if (bg(qq)) then
+         jsub = jsub+1
+         sub_c(qq) = jsub; prin_c(qq) = .true.; hp_c(qq) = zero
+       end if
+     end do
+   end if
+   do jb2=1,nbx
+     oj = offset(ikx)+jb2
+     nux(jb2) = two*nfull(oj)/orbs%nkpt
+     do qq=1,nbk
+       if (is_jk) then
+         call rdmft_coef_jk(dtset%rdmft_functional,nfull(oj),nfull(qq),qq==oj,alpha,ac,cc)
+       else
+         call rdmft_coef_pnof(dtset%rdmft_functional,nfull(oj),nfull(qq),qq==oj,sub_c(oj),sub_c(qq),prin_c(oj),prin_c(qq),&
+                              hp_c(oj),hp_c(qq),dtset%rdmft_selfint,ac,cc)
+       end if
+       acf(jb2,qq) = ac/nk2
+       ccf(jb2,qq) = cc/nk2
+     end do
+   end do
+   call rdmft_gen_fock_k(orbs,ikx,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
+                         offset,nbk,hmat(1:nbx,1:nbx,ikx),nux,acf,ccf,fx)
+   ABI_FREE(acf)
+   ABI_FREE(ccf)
+   ABI_FREE(nux)
+   ABI_FREE(sub_c)
+   ABI_FREE(prin_c)
+   ABI_FREE(hp_c)
+ end subroutine build_fock
+
  subroutine check_rotations(e_ref)
    ! Finite-difference gradient dE/dtheta and curvature of the energy with respect to the rotation of two states of the
    ! same k-point, at fixed occupations
    real(dp),intent(in) :: e_ref
-   integer :: ik0,ip_b,iq_b,nb0,ndir
-   real(dp) :: e0,ep,em,step
+   integer :: ik0,ip_b,iq_b,kp,nb0,ndir
+   real(dp) :: e0,ep,em,gan,step
+   complex(dpc) :: dg
+   complex(dpc),allocatable :: f0(:,:),fp(:,:)
+   logical :: has_p
    logical :: imag
    character(len=500) :: cmsg
    ik0 = dtset%rdmft_rot_k
    nb0 = orbs%nband(ik0,1)
    step = dtset%rdmft_rot_step
    e0 = energy_rot(orbs,h1c)
+   ! Analytic gradient from the generalized Fock matrices of the k-point (and of -k, rotated with the conjugate matrix)
+   ABI_MALLOC(f0,(nb0,nb0))
+   call build_fock(ik0,f0)
+   kp = orbs%tr_k(ik0)
+   has_p = (kp > 0 .and. kp /= ik0)
+   ABI_MALLOC(fp,(nb0,nb0))
+   fp = czero
+   if (has_p) call build_fock(kp,fp)
    write(cmsg,'(2a,es20.12,a,es10.2,3a,i0,a,es9.2,a)') ch10,' RDMFT: rotation check, E(0) = ',e0,&
      '  (E(0) - optimized energy =',e0-e_ref,')',ch10,' k-point ',ik0,', step ',step,' radians (central differences)'
    call wrtout([ab_out,std_out],cmsg)
-   write(cmsg,'(a)') '   band p  band q    n_p       n_q     direction      dE/dtheta        d2E/dtheta2'
+   write(cmsg,'(2a)') '   band p  band q    n_p       n_q     direction      dE/dtheta (num.)   dE/dtheta (analytic)  ',&
+     '  d2E/dtheta2'
    call wrtout([ab_out,std_out],cmsg)
    do ip_b=1,nb0
      do iq_b=ip_b+1,nb0
@@ -545,12 +623,24 @@ contains
          imag = (ndir == 2)
          ep = energy_rotated(ik0,ip_b,iq_b,step,imag)
          em = energy_rotated(ik0,ip_b,iq_b,-step,imag)
-         write(cmsg,'(2i8,2f10.6,5x,a,2es18.8)') ip_b,iq_b,nfull(offset(ik0)+ip_b),nfull(offset(ik0)+iq_b),&
-           merge('imaginary','real     ',imag),(ep-em)/(two*step),(ep-two*e0+em)/step**2
+         ! analytic: real direction 2 Re (F_pq - conjg F_qp); imaginary direction -2 Im (F_pq - conjg F_qp);
+         ! at -k the rotation matrix is conjugated, which changes the sign of the imaginary direction
+         dg = f0(ip_b,iq_b)-conjg(f0(iq_b,ip_b))
+         if (.not.imag) then
+           gan = two*real(dg,dp)
+           if (has_p) gan = gan+two*real(fp(ip_b,iq_b)-conjg(fp(iq_b,ip_b)),dp)
+         else
+           gan = -two*aimag(dg)
+           if (has_p) gan = gan+two*aimag(fp(ip_b,iq_b)-conjg(fp(iq_b,ip_b)))
+         end if
+         write(cmsg,'(2i8,2f10.6,5x,a,3es18.8)') ip_b,iq_b,nfull(offset(ik0)+ip_b),nfull(offset(ik0)+iq_b),&
+           merge('imaginary','real     ',imag),(ep-em)/(two*step),gan,(ep-two*e0+em)/step**2
          call wrtout([ab_out,std_out],cmsg)
        end do
      end do
    end do
+   ABI_FREE(f0)
+   ABI_FREE(fp)
  end subroutine check_rotations
 
  subroutine write_occ_file(fname)

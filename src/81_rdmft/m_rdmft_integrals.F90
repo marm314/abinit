@@ -55,6 +55,8 @@ module m_rdmft_integrals
 !!
 !! SOURCE
 
+ public :: orbs_to_real
+
  type,public :: rdmft_ints_t
 
    integer :: nbk = 0
