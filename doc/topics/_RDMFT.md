@@ -72,6 +72,16 @@ occupations of $\mathbf{k}$ and $-\mathbf{k}$ do assume that the orbital $n$ at 
 $\mathbf{k}$ up to a phase; this is checked at the start (largest $1-|\langle\psi_{n,-\mathbf{k}}|\Theta\psi_{n\mathbf{k}}\rangle|$ is
 printed, with a warning if it is larger than $10^{-4}$, for example for a mixture of degenerate states).
 
+## Using time reversal to reduce the k-points
+
+The orbital at $-\mathbf{k}$ is the complex conjugate of the one at $\mathbf{k}$. A ground-state calculation can therefore use a
+mesh reduced by time reversal ([[kptopt]] = 2, only one of each pair $\pm\mathbf{k}$), which halves its cost: for all the
+functionals the missing $-\mathbf{k}$ states are built by conjugation and the completed mesh gets uniform weights (the points that
+are their own $-\mathbf{k}$ are kept once). Then, with [[rdmft_tr_reduce]] = 1 (default), the Coulomb and exchange integrals are
+computed only for the independent blocks of k-points and the rest of the matrices is filled by the symmetry relations
+$J_{pq}=J_{p\bar q}=J_{\bar p\bar q}$ and $K_{\bar p\bar q}=K_{pq}$; the generalized Fock matrices already use
+the representative k-points. [[rdmft_tr_reduce]] = 0 computes all the pairs explicitly, for debugging; the results must be the same.
+
 ## Active space and cost
 
 The occupations that are optimized are those of the active orbitals: the occupied orbitals with an energy larger
@@ -161,6 +171,26 @@ lower the energy, it restarts from the best point with the learning rate multipl
 [[rdmft_adam_incr]] more iterations (up to [[rdmft_adam_maxit]]). The rotations are limited to the bands of the WFK file:
 the minimum can only be reached if these bands span the orbitals of the optimum, so a large [[nband]] is needed. A good test
 is to start from PBE orbitals with the SD functional: the energy tends to the Hartree-Fock one as [[nband]] grows.
+
+## Orbital space and the WFK file
+
+The orbitals, and therefore the occupations and the rotations of the orbitals, are those of the bands stored in the WFK file
+of the ground-state calculation: the [[nband]] of the RDMFT dataset is ignored. The cutoff [[ecut]] (together with the cell, the
+k-points and the pseudopotentials) must be the one of the ground-state calculation: it fixes the plane-wave basis in which
+the orbitals are expanded, the FFT mesh of the pair densities and the one-electron operator. The number of
+states that [[ecut]] can produce, however, is the number of plane waves (hundreds per k-point even for a small cell), and
+the WFK file usually contains only a few of them. All the Coulomb and exchange integrals are computed exactly for the
+loaded orbitals, but the minimization is restricted to the space they span: the energies are variational upper
+bounds of the ones in the complete basis. For example, the single-determinant functional started from Kohn-Sham orbitals
+([[rdmft_functional]] = 1 with [[rdmft_orb_macro]] > 0) must reach the Hartree-Fock energy, and it only does if the loaded
+bands span the Hartree-Fock orbitals. The output reports the bands loaded and the plane waves available.
+
+With [[rdmft_complete]] = 1 the band set of every k-point is completed to all the plane waves (a Gram-Schmidt procedure on plane
+waves). Then the rotations span the whole basis, and PBE orbitals optimized with the SD functional reproduce the Hartree-Fock
+total energy of the ground-state calculation (to about 1e-9 Ha, with [[rdmft_occ_min]] very small). This is expensive
+(the number of orbitals is the number of plane waves times the number of k-points) and is intended for small cells and
+tests. The cost is greatly reduced by [[rdmft_occ_skip]], which drops the orbitals that are (almost) unoccupied from the
+sums of pair densities.
 
 ## Present limitations
 

@@ -287,12 +287,19 @@ end subroutine orb_to_real_one
 !!  free(nbk), bg(nbk) = free and background orbitals (composite index), disjoint
 !!  core_ints = if true compute the exchange constants of the background-background pairs
 !!  quiet = (optional) if true, do not print the summary line
+!!  comm = (optional) MPI communicator over which the pairs of orbitals are shared
+!!  req = (optional) request of the exchange part of the generalized Fock matrices, built from the same pair densities
+!!  rel(nbk) = (optional) relevant orbitals: the pairs with an orbital that is not relevant are not computed
+!!  reduce = (optional) if true, use time reversal: only the independent blocks of k-points (a representative of each pair
+!!    k, -k) are computed, the rest of the matrices J_pq, K_pq is filled by symmetry (J_pq = J_p,-q = J_-p,-q and
+!!    K_-p,-q = K_pq). The free and background orbitals must be the same at k and -k.
 !!
 !! OUTPUT
 !!  ints
 !!
 !! SOURCE
-subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,free,bg,core_ints,quiet,comm,req)
+subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,free,bg,core_ints,quiet,comm,req,&
+                               rel,reduce)
 
  !Arguments ------------------------------------
  !scalars
@@ -304,6 +311,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  logical,optional,intent(in) :: quiet
  integer,optional,intent(in) :: comm
  type(rdmft_fockreq_t),optional,intent(inout) :: req
+ logical,optional,intent(in) :: rel(:)
+ logical,optional,intent(in) :: reduce
  !arrays
  integer,intent(in) :: ngfft(18)
  logical,intent(in) :: free(:),bg(:)
@@ -312,7 +321,10 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  !scalars
  integer,parameter :: izero0=0
  integer :: jlo,jhi,cnt,comm_,ib,ierr,ik,iq,ip,jb,jk,jp,me,nb,nbj,nfft,nproc
- logical :: fused,needk,wantf
+ logical :: canon,fused,needk,red,wantf,isff,anybg
+ integer :: ipb,iqb,pk
+ integer,allocatable :: trk(:)
+ real(dp) :: wgt
  complex(dpc),allocatable :: yy(:,:,:)
  real(dp),allocatable :: mall(:,:,:)
  real(dp) :: kval
@@ -321,7 +333,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  type(MPI_type) :: mpi_enreg
  !arrays
  real(dp) :: qpt(3),gmet(3,3)
- real(dp),allocatable :: ui1(:,:),uj1(:,:),jtmp(:,:,:),vrho(:,:,:),prod(:,:),pgrid(:,:),rhog(:,:,:),rbg(:,:),rtmp(:,:),vc(:),vq(:,:),ui(:,:,:),uj(:,:,:)
+ real(dp),allocatable :: ui1(:,:),uj1(:,:),jtmp(:,:,:),vrho(:,:,:),prod(:,:),pgrid(:,:),rhog(:,:,:),rbg(:,:)
+ real(dp),allocatable :: rtmp(:,:),vc(:),vq(:,:),ui(:,:,:),uj(:,:,:)
 
 ! *************************************************************************
 
@@ -364,6 +377,27 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
      ints%comp_of(ip) = jp
    end if
  end do
+ ! Use of time reversal: the orbital (n,-k) is the complex conjugate of (n,k)
+ red = .false.
+ if (present(reduce)) red = reduce
+ ABI_MALLOC(trk,(orbs%nkpt))
+ trk = orbs%tr_k
+ if (red .and. any(trk == 0)) red = .false.
+ if (red) then
+   do ik=1,orbs%nkpt
+     pk = trk(ik)
+     if (pk == ik) cycle
+     if (orbs%nband(pk,1) /= orbs%nband(ik,1)) then
+       ABI_ERROR('RDMFT: different numbers of bands at k and -k (rdmft_tr_reduce = 1).')
+     end if
+     do ib=1,orbs%nband(ik,1)
+       if ((free(ints%offset(ik)+ib) .neqv. free(ints%offset(pk)+ib)) .or. &
+           (bg(ints%offset(ik)+ib) .neqv. bg(ints%offset(pk)+ib))) then
+         ABI_ERROR('RDMFT: the active space is not the same at k and -k (use rdmft_tr_reduce = 0).')
+       end if
+     end do
+   end do
+ end if
  ABI_MALLOC(ints%jint,(ints%nfree,ints%nfree))
  ABI_MALLOC(ints%kint,(ints%nfree,ints%nfree))
  ABI_MALLOC(ints%bj,(ints%nfree))
@@ -392,7 +426,13 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
 
  ABI_MALLOC(ui1,(2,nfft))
  cnt = 0
+
+ ! The density of the orbital (n,-k) is the one of (n,k): the representative k-points are transformed and the density is
+ ! copied to the partner (background orbitals count twice)
  do ik=1,orbs%nkpt
+   if (red .and. trk(ik) < ik) cycle
+   wgt = one
+   if (red .and. trk(ik) > ik) wgt = two
    nb = orbs%nband(ik,1)
    do ib=1,nb
      ip = ints%offset(ik)+ib
@@ -404,10 +444,13 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
      prod(2,:) = zero
      if (free(ip)) then
        call fourdp(2,rhog(:,:,ints%free_of(ip)),prod,-1,mpi_enreg,nfft,1,ngfft,0)
+       if (red .and. trk(ik) > ik) then
+         rhog(:,:,ints%free_of(ints%offset(trk(ik))+ib)) = rhog(:,:,ints%free_of(ip))
+       end if
      else
        call fourdp(2,rtmp,prod,-1,mpi_enreg,nfft,1,ngfft,0)
-       rbg = rbg+rtmp
-       ints%sjd = ints%sjd+sum(vc(:)*(rtmp(1,:)**2+rtmp(2,:)**2))/orbs%ucvol
+       rbg = rbg+wgt*rtmp
+       ints%sjd = ints%sjd+wgt*sum(vc(:)*(rtmp(1,:)**2+rtmp(2,:)**2))/orbs%ucvol
      end if
    end do
  end do
@@ -469,9 +512,25 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    ABI_MALLOC(ui,(2,nfft,nb))
    call orbs_to_real(orbs,ik,ngfft,mpi_enreg,ui)
    do jk=1,orbs%nkpt
-     if (jk < ik .and. .not.wantf) cycle
      nbj = orbs%nband(jk,1)
      if (.not.any(free(ints%offset(jk)+1:ints%offset(jk)+nbj) .or. bg(ints%offset(jk)+1:ints%offset(jk)+nbj))) cycle
+     ! Independent blocks (k,k') of the exchange integrals between free orbitals. Without time reversal: k' >= k. With it
+     ! (the orbit of a block under the transposition and k,k' -> -k,-k'): k is a representative; k' is a representative
+     ! with k' >= k, or the partner of a representative k'' >= k (and then k is not time-reversal invariant).
+     canon = (jk >= ik)
+     if (red) then
+       canon = .false.
+       if (trk(ik) >= ik) then
+         if (trk(jk) >= jk) then
+           canon = (jk >= ik)
+         else
+           canon = (trk(jk) >= ik .and. trk(ik) /= ik)
+         end if
+       end if
+     end if
+     ! Pairs with a background orbital: k' >= k
+     anybg = any(bg(ints%offset(ik)+1:ints%offset(ik)+nb)) .or. any(bg(ints%offset(jk)+1:ints%offset(jk)+nbj))
+     if (.not.(canon .or. wantf .or. (anybg .and. jk >= ik))) cycle
      !Coulomb kernel for q = k' - k
      qpt(:) = orbs%kpt(:,jk)-orbs%kpt(:,ik)
      call barevcoul(rcut_k,icutcoul_k,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc)
@@ -480,19 +539,25 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
        iq = ints%offset(jk)+jb
        fq = free(iq); bq = bg(iq)
        if (.not.(fq .or. bq)) cycle
+       if (present(rel)) then
+         if (.not.rel(iq)) cycle
+       end if
        cnt = cnt+1
        if (mod(cnt,nproc) /= me) cycle
        call orb_to_real_one(orbs,jk,jb,ngfft,mpi_enreg,uj1)
        do ib=1,nb
-         if (jk == ik .and. jb > ib) then
-           needk = .false.
-         else
-           needk = (jk >= ik)
-         end if
          ip = ints%offset(ik)+ib
          fp = free(ip); bp = bg(ip)
-         needk = needk .and. (fp .or. bp)
-         if (bp .and. bq .and. .not.core_ints) needk = .false.
+         isff = (fp .and. fq)
+         if (isff) then
+           needk = canon
+           if (jb > ib .and. (jk == ik .or. (red .and. jk == trk(ik)))) needk = .false.
+         else
+           needk = (jk >= ik) .and. (fp .or. bp)
+           if (jk == ik .and. jb > ib) needk = .false.
+           if (bp .and. bq .and. .not.core_ints) needk = .false.
+         end if
+         if (present(rel) .and. needk) needk = rel(ip)
          if (.not.(needk .or. wantf)) cycle
          ! conjg(u_i) u_j
          prod(1,:) = ui(1,:,ib)*uj1(1,:)+ui(2,:,ib)*uj1(2,:)
@@ -501,9 +566,16 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          if (wantf) mall(:,:,ib) = pgrid
          if (.not.needk) cycle
          kval = sum(vc(:)*(pgrid(1,:)**2+pgrid(2,:)**2))/orbs%ucvol
-         if (fp .and. fq) then
+         if (isff) then
            ints%kint(ints%free_of(ip),ints%free_of(iq)) = kval
            ints%kint(ints%free_of(iq),ints%free_of(ip)) = kval
+           if (red) then
+             ! image under time reversal: K_{-p,-q} = K_{pq}
+             ipb = ints%offset(trk(ik))+ib
+             iqb = ints%offset(trk(jk))+jb
+             ints%kint(ints%free_of(ipb),ints%free_of(iqb)) = kval
+             ints%kint(ints%free_of(iqb),ints%free_of(ipb)) = kval
+           end if
          else if (fp .and. bq) then
            ints%bk(ints%free_of(ip)) = ints%bk(ints%free_of(ip))+kval
          else if (bp .and. fq) then
@@ -518,12 +590,12 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          end if
        end do
        if (wantf) then
-           ! F_pj += sum_G conjg(M_p) Y_j,  Y_j = -2 c_jq / Omega v M_j
-           do ib=1,nb
-             yy(:,ib,1) = cmplx(-two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(1,:,ib), &
-                                -two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(2,:,ib),kind=dpc)
-           end do
-           call zgemm('C','N',nb,nb,nfft,cone,mall,nfft,yy,nfft,cone,req%fx(1,1,ik),size(req%fx,1))
+         ! F_pj += sum_G conjg(M_p) Y_j,  Y_j = -2 c_jq / Omega v M_j
+         do ib=1,nb
+           yy(:,ib,1) = cmplx(-two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(1,:,ib), &
+                              -two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(2,:,ib),kind=dpc)
+         end do
+         call zgemm('C','N',nb,nb,nfft,cone,mall,nfft,yy,nfft,cone,req%fx(1,1,ik),size(req%fx,1))
        end if
      end do
    end do
@@ -537,6 +609,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    if (fused) call xmpi_sum(req%fx,comm_,ierr)
  end if
  ABI_FREE(uj1)
+ ABI_FREE(trk)
  if (fused) then
    ABI_FREE(mall)
    ABI_FREE(yy)

@@ -678,6 +678,7 @@ type, public :: dataset_type
  integer :: rdmft_rot_q
  integer :: rdmft_selfint
  integer :: rdmft_start
+ integer :: rdmft_tr_reduce
  integer :: recgratio
  integer :: recnpath
  integer :: recnrec
@@ -1019,6 +1020,7 @@ type, public :: dataset_type
  real(dp) :: rdmft_adam_rate
  real(dp) :: rdmft_ecut_act
  real(dp) :: rdmft_occ_min
+ real(dp) :: rdmft_occ_skip
  real(dp) :: rdmft_orb_etol
  real(dp) :: rdmft_orb_gtol
  real(dp) :: rdmft_power
@@ -2314,8 +2316,10 @@ type(dataset_type) function dtset_copy(dtin) result(dtout)
  dtout%rdmft_adam_rate = dtin%rdmft_adam_rate
  dtout%rdmft_complete = dtin%rdmft_complete
  dtout%rdmft_occ_min = dtin%rdmft_occ_min
+ dtout%rdmft_occ_skip = dtin%rdmft_occ_skip
  dtout%rdmft_selfint        = dtin%rdmft_selfint
  dtout%rdmft_start          = dtin%rdmft_start
+ dtout%rdmft_tr_reduce = dtin%rdmft_tr_reduce
  dtout%recgratio          = dtin%recgratio
  dtout%recnpath           = dtin%recnpath
  dtout%recnrec            = dtin%recnrec
@@ -4067,7 +4071,7 @@ subroutine chkvars(string)
  list_vars=trim(list_vars)//' rdmft_check_rot rdmft_core_ints rdmft_ecut_act rdmft_functional rdmft_ncoupl rdmft_nocc_act rdmft_nvir_act'
  list_vars=trim(list_vars)//' rdmft_power rdmft_restart rdmft_rot_k rdmft_rot_p rdmft_rot_q rdmft_rot_step'
  list_vars=trim(list_vars)//' rdmft_selfint rdmft_start'
- list_vars=trim(list_vars)//' rdmft_occ_min rdmft_complete rdmft_adam_beta1 rdmft_adam_beta2 rdmft_adam_incr rdmft_adam_maxit rdmft_adam_rate rdmft_adam_iter rdmft_adam_lr rdmft_orb_etol rdmft_orb_gtol rdmft_orb_macro'
+ list_vars=trim(list_vars)//' rdmft_tr_reduce rdmft_occ_min rdmft_occ_skip rdmft_complete rdmft_adam_beta1 rdmft_adam_beta2 rdmft_adam_incr rdmft_adam_maxit rdmft_adam_rate rdmft_adam_iter rdmft_adam_lr rdmft_orb_etol rdmft_orb_gtol rdmft_orb_macro'
  list_vars=trim(list_vars)//' red_dfield red_efield red_efieldbar restartxf'
  list_vars=trim(list_vars)//' rfatpol rfddk rfdir rfelfd rfeta rfmagn rfmeth rfomega rfphon'
  list_vars=trim(list_vars)//' rfstrs rfstrs_ref rf2_dkdk rf2_dkde rf2_pert1_dir rf2_pert2_dir rhoqpmix rifcsph rprim'

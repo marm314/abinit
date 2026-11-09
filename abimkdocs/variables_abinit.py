@@ -20116,6 +20116,54 @@ Hartree-Fock energy.
 ),
 
 Variable(
+    abivarname="rdmft_occ_skip",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1.0e-6,
+    mnemonics="Reduced Density Matrix Functional Theory: threshold to SKIP the (almost) unoccupied orbitals",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+In the optimization of the orbitals ([[rdmft_orb_macro]]) the energy and its gradient need the pair densities of an orbital
+with all the orbitals it is coupled to. An orbital whose couplings to all the others are smaller than **rdmft_occ_skip**
+(the largest coefficient of its Coulomb and exchange terms in the energy, in units of electrons) is considered
+unoccupied: it is dropped from these sums, which removes most of the cost when many virtual orbitals are present. For
+the Hartree-Fock-like functionals ([[rdmft_functional]] = 1) the coefficients are proportional to the occupations,
+so this means occupations below the threshold; for the functionals with square roots of the occupations
+(MBB, ...) the couplings of a nearly empty orbital are much larger than its occupation and the orbital is kept.
+The energies printed during the ADAM iterations neglect the dropped terms; the energies printed after the
+re-optimization of the occupations (and the final one) include all the pairs. A value of 0 keeps everything.
+""",
+),
+
+Variable(
+    abivarname="rdmft_tr_reduce",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1,
+    mnemonics="Reduced Density Matrix Functional Theory: use TIME-REVERSAL to REDUCE the k-points",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+In an RDMFT calculation ([[optdriver]] = 11) the orbitals at $-\mathbf{k}$ are the complex conjugates of the ones at
+$\mathbf{k}$ (time-reversal symmetry without spin-orbit coupling, collinear spin). If the k-point mesh of the ground-state WFK
+file is reduced by time reversal (for example [[kptopt]] = 2: only one of each pair $\pm\mathbf{k}$ is present), the missing
+$-\mathbf{k}$ states are always built by conjugation, for all the functionals, and the mesh is given uniform weights.
+
+With **rdmft_tr_reduce** = 1 (default) the Coulomb and exchange integrals are computed only for the independent blocks of
+k-points, the representatives $\mathbf{k}$ of each pair $\pm\mathbf{k}$, and the rest of the matrices is filled by symmetry:
+$J_{pq}=J_{p\bar q}=J_{\bar p\bar q}$ and $K_{\bar p\bar q}=K_{pq}$ (the exchange integral $K_{p\bar q}$ is
+a different block, computed explicitly), where a bar denotes the time-reversed orbital. The functionals and the optimizers use the
+same full matrices. With **rdmft_tr_reduce** = 0 all the pairs of k-points of the mesh are computed explicitly: the results are the same
+(to numerical precision), and this option is useful to debug.
+""",
+),
+
+Variable(
     abivarname="rdmft_core_ints",
     varset="dev",
     vartype="integer",

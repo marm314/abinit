@@ -607,9 +607,9 @@ subroutine rdmft_orbs_complete_time_reversal(orbs,nadded)
 
  !Local variables-------------------------------
  !scalars
- integer :: ik,nk1,nk2
+ integer :: ik,j,nk1,nk2
  !arrays
- integer,allocatable :: nband(:,:),npw(:),kg(:,:,:),tr_new(:)
+ integer,allocatable :: nband(:,:),npw(:),kg(:,:,:),tr_new(:),src(:)
  real(dp),allocatable :: kpt(:,:),wtk(:),eig(:,:,:),occ(:,:,:),cg(:,:,:,:,:)
  logical,allocatable :: added(:)
 
@@ -617,12 +617,23 @@ subroutine rdmft_orbs_complete_time_reversal(orbs,nadded)
 
  nadded = 0
  nk1 = orbs%nkpt
- if (all(orbs%tr_k(:) > 0)) return
- if (any(orbs%tr_k(:) > 0)) then
+ ! k-points whose -k is not in the mesh (the time-reversal-invariant ones, tr_k = k, are their own partners)
+ nadded = count(orbs%tr_k(:) == 0)
+ if (nadded == 0) return
+ if (any(orbs%tr_k(:) > 0 .and. orbs%tr_k(:) /= [(ik,ik=1,nk1)])) then
+   nadded = 0
    ABI_ERROR('RDMFT: the k-point mesh has some k-points with -k and some without, the completion is not supported.')
  end if
 
- nk2 = 2*nk1
+ nk2 = nk1+nadded
+ ABI_MALLOC(src,(nadded))
+ j = 0
+ do ik=1,nk1
+   if (orbs%tr_k(ik) == 0) then
+     j = j+1
+     src(j) = ik
+   end if
+ end do
  ABI_MALLOC(nband,(nk2,orbs%nsppol))
  ABI_MALLOC(npw,(nk2))
  ABI_MALLOC(kg,(3,orbs%mpw,nk2))
@@ -642,19 +653,22 @@ subroutine rdmft_orbs_complete_time_reversal(orbs,nadded)
  occ(:,1:nk1,:) = orbs%occ
  cg(:,:,:,1:nk1,:) = orbs%cg
  added(1:nk1) = .false.
- do ik=1,nk1
-   nband(nk1+ik,:) = orbs%nband(ik,:)
-   npw(nk1+ik) = orbs%npw(ik)
-   kg(:,:,nk1+ik) = -orbs%kg(:,:,ik)
-   kpt(:,nk1+ik) = -orbs%kpt(:,ik)
-   eig(:,nk1+ik,:) = orbs%eig(:,ik,:)
-   occ(:,nk1+ik,:) = orbs%occ(:,ik,:)
-   cg(1,:,:,nk1+ik,:) = orbs%cg(1,:,:,ik,:)
-   cg(2,:,:,nk1+ik,:) = -orbs%cg(2,:,:,ik,:)
-   added(nk1+ik) = .true.
-   tr_new(ik) = nk1+ik
-   tr_new(nk1+ik) = ik
+ tr_new(1:nk1) = orbs%tr_k
+ do j=1,nadded
+   ik = src(j)
+   nband(nk1+j,:) = orbs%nband(ik,:)
+   npw(nk1+j) = orbs%npw(ik)
+   kg(:,:,nk1+j) = -orbs%kg(:,:,ik)
+   kpt(:,nk1+j) = -orbs%kpt(:,ik)
+   eig(:,nk1+j,:) = orbs%eig(:,ik,:)
+   occ(:,nk1+j,:) = orbs%occ(:,ik,:)
+   cg(1,:,:,nk1+j,:) = orbs%cg(1,:,:,ik,:)
+   cg(2,:,:,nk1+j,:) = -orbs%cg(2,:,:,ik,:)
+   added(nk1+j) = .true.
+   tr_new(ik) = nk1+j
+   tr_new(nk1+j) = ik
  end do
+ ! Uniform weights: the pairs (k,-k) have the same weight, and so do the time-reversal-invariant points
  wtk = one/real(nk2,dp)
 
  call move_alloc(nband,orbs%nband)
@@ -667,8 +681,8 @@ subroutine rdmft_orbs_complete_time_reversal(orbs,nadded)
  call move_alloc(cg,orbs%cg)
  call move_alloc(added,orbs%added)
  call move_alloc(tr_new,orbs%tr_k)
+ ABI_FREE(src)
  orbs%nkpt = nk2
- nadded = nk1
 
 end subroutine rdmft_orbs_complete_time_reversal
 !!***

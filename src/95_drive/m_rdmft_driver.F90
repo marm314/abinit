@@ -103,7 +103,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  !Local variables-------------------------------
  !scalars
  integer,parameter :: master=0
- integer :: ib,ierr,ierr_t,ifunc,ik,ik_w,ib_w,ip,iq,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
+ integer :: ib,ierr,ierr_t,ifunc,ik,ik_w,ib_w,ip,iq,jk,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
  logical :: conv,is_jk,is_pnof,need_table,ok_fd,table_ok
  real(dp) :: alpha,e_corepsp,e_ewald,eexch,ehartree,ekin_tot,eone,eopt,ecut_eff,ecutdg_eff,etot,gsqcutc_eff,gsqcutf_eff
  real(dp) :: devtr,maxdev,ntarget,nk2,sexch,shart
@@ -151,6 +151,22 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      nadded,' (total number of orbitals ',sum(orbs%nband(:,1)),')'
    call wrtout([ab_out,std_out],msg)
  end if
+
+ !Size of the orbital space with respect to the plane-wave basis of ecut
+ write(msg,'(2a,i0,a,i0,a,i0,a,i0,a,f6.1,a)') ch10,' RDMFT: bands per k-point: ',minval(orbs%nband(:,1)),'-',&
+   maxval(orbs%nband(:,1)),'; plane waves per k-point (ecut): ',minval(orbs%npw),'-',maxval(orbs%npw),' (the bands are ',&
+   100.0_dp*real(sum(orbs%nband(:,1)),dp)/real(sum(orbs%npw),dp),' % of the plane-wave basis)'
+ call wrtout([ab_out,std_out],msg)
+ if (all(orbs%nband(:,1) == orbs%npw)) then
+   write(msg,'(2a)') ' RDMFT: the plane-wave basis is complete: the occupations and the orbital rotations span all the',&
+     ' states that ecut can produce.'
+ else
+   write(msg,'(3a)') ' RDMFT: the occupations and the orbital rotations are restricted to these bands (a variational ',&
+     'restriction of the orbital space, the energies are upper bounds of the full-basis ones);',&
+     ' use rdmft_complete = 1 to span the whole plane-wave basis.'
+ end if
+ call wrtout([ab_out,std_out],msg)
+
  maxdev = orbs%check_orthonormality()
  write(msg,'(2a,es12.4,a)') ch10,' RDMFT: maximum deviation from orthonormality of the orbitals = ',maxdev,ch10
  call wrtout([ab_out,std_out],msg)
@@ -179,14 +195,13 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    call wrtout([ab_out,std_out],msg)
  end if
 
- !PNOF functionals need subspaces closed under k -> -k: complete the mesh with the time-reversed orbitals if needed
- if (is_pnof) then
-   call orbs%complete_time_reversal(nadded)
-   if (nadded > 0) then
-     write(msg,'(2a,i0,a,i0,a,i0,2a)') ch10,' RDMFT: the k-point mesh is not closed under k -> -k; ',nadded,&
-       ' k-points were added with the time-reversed orbitals (total ',orbs%nkpt,' k-points, weight 1/',orbs%nkpt,')',ch10
-     call wrtout([ab_out,std_out],msg)
-   end if
+ !Complete the mesh with the time-reversed orbitals (c_{n,-k}(G) = conjg(c_{nk}(-G))) if the mesh is not closed under
+ !k -> -k, for all the functionals (for example a WFK file computed with the k-points reduced by time reversal)
+ call orbs%complete_time_reversal(nadded)
+ if (nadded > 0) then
+   write(msg,'(2a,i0,a,i0,a,i0,2a)') ch10,' RDMFT: the k-point mesh is not closed under k -> -k; ',nadded,&
+     ' k-points were added with the time-reversed orbitals (total ',orbs%nkpt,' k-points, weight 1/',orbs%nkpt,')',ch10
+   call wrtout([ab_out,std_out],msg)
  end if
  nk2 = real(orbs%nkpt,dp)**2
 
@@ -268,11 +283,34 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ', frozen virtual = ',count(.not.occd.and..not.actc),ch10
  call wrtout([ab_out,std_out],msg)
 
+
+ !With rdmft_tr_reduce = 1 the matrices of the integrals are filled by time reversal: the active space (free and
+ !background orbitals) must be the same at k and -k
+ if (dtset%rdmft_tr_reduce == 1) then
+   do ik=1,orbs%nkpt
+     jk = orbs%tr_k(ik)
+     if (jk <= 0 .or. jk == ik) cycle
+     if (orbs%nband(jk,1) /= orbs%nband(ik,1)) then
+       write(msg,'(2(a,i0),2a)') 'RDMFT: the k-points ',ik,' and ',jk,' (time-reversed partners) have different ',&
+         'numbers of bands. Use rdmft_tr_reduce = 0.'
+       ABI_ERROR(msg)
+     end if
+     do ib=1,orbs%nband(ik,1)
+       if ((free(offset(ik)+ib) .neqv. free(offset(jk)+ib)) .or. (bg(offset(ik)+ib) .neqv. bg(offset(jk)+ib))) then
+         write(msg,'(3(a,i0),3a)') 'RDMFT: the active space of band ',ib,' differs between the k-point ',ik,&
+           ' and its time-reversed partner ',jk,'. The active window (rdmft_ecut_act, rdmft_nocc_act, rdmft_nvir_act)',&
+           ' must be symmetric under k -> -k for rdmft_tr_reduce = 1; use rdmft_tr_reduce = 0.'
+         ABI_ERROR(msg)
+       end if
+     end do
+   end do
+ end if
+
  ! ------------------------------------------------------------------
  ! J and K integrals in the active space
  ! ------------------------------------------------------------------
  call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
-                   dtset%rdmft_core_ints == 1)
+                   dtset%rdmft_core_ints == 1,reduce=(dtset%rdmft_tr_reduce == 1))
  nf = ints%nfree
  ABI_MALLOC(nf_gs,(nf))
  ABI_MALLOC(h1f,(nf))
@@ -585,8 +623,9 @@ contains
    integer,intent(in) :: kpar(:)
    real(dp),intent(out) :: e_out,gmax
    complex(dpc),intent(out) :: grad(:)
-   integer :: jk,ipar,pp,qq,nb2,nbmax
+   integer :: ib2,jk,ipar,pp,qq,nb2,nbmax
    real(dp) :: fac
+   logical,allocatable :: relev(:)
    complex(dpc) :: dg
    complex(dpc),allocatable :: fk(:,:),fh(:,:),fchk(:,:)
    real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:)
@@ -597,21 +636,34 @@ contains
    ABI_MALLOC(req%fx,(nbmax,nbmax,orbs%nkpt))
    req%ccoef = zero
    req%want = (kpar >= 0)
+   ABI_MALLOC(relev,(nbk))
    do jk=1,orbs%nkpt
-     if (kpar(jk) < 0) cycle
      nb2 = orbs%nband(jk,1)
      ABI_MALLOC(acf,(nb2,nbk))
      ABI_MALLOC(ccf,(nb2,nbk))
      ABI_MALLOC(nux,(nb2))
      call build_coefs(jk,acf,ccf,nux)
-     req%ccoef(1:nb2,:,jk) = ccf
+     ! An orbital is relevant if its largest coupling (coefficient of the energy, in electrons) reaches the threshold; the
+     ! couplings are symmetric, so the row of each band gives its relevance. The dropped couplings are set to zero.
+     do ib2=1,nb2
+       relev(offset(jk)+ib2) = (nk2*max(maxval(abs(acf(ib2,:))),maxval(abs(ccf(ib2,:)))) >= dtset%rdmft_occ_skip)
+     end do
+     if (kpar(jk) >= 0) req%ccoef(1:nb2,:,jk) = ccf
      ABI_FREE(acf)
      ABI_FREE(ccf)
      ABI_FREE(nux)
    end do
+   do jk=1,orbs%nkpt
+     if (kpar(jk) < 0) cycle
+     nb2 = orbs%nband(jk,1)
+     do ib2=1,nbk
+       if (.not.relev(ib2)) req%ccoef(1:nb2,ib2,jk) = zero
+     end do
+   end do
    t0 = abi_wtime()
    call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
-                     dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,req=req)
+                     dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,req=req,rel=relev,&
+                     reduce=(dtset%rdmft_tr_reduce == 1))
    tm(1) = tm(1)+abi_wtime()-t0
    t0 = abi_wtime()
    call sync_h1f()
@@ -627,6 +679,9 @@ contains
      ABI_MALLOC(fk,(nb2,nb2))
      ABI_MALLOC(fh,(nb2,nb2))
      call build_coefs(jk,acf,ccf,nux)
+     do ib2=1,nbk
+       if (.not.relev(ib2)) acf(:,ib2) = zero
+     end do
      t0 = abi_wtime()
      call rdmft_fock_hartree_k(orbs,jk,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,offset,nbk,acf,xmpi_world,fh)
      tm(3) = tm(3)+abi_wtime()-t0
@@ -663,6 +718,7 @@ contains
    end do
    gmax = zero
    if (size(grad) > 0) gmax = maxval(abs(grad))
+   ABI_FREE(relev)
    ABI_FREE(req%want)
    ABI_FREE(req%ccoef)
    ABI_FREE(req%fx)
@@ -680,7 +736,6 @@ contains
    complex(dpc),allocatable :: hmat_b(:,:,:)
    real(dp),allocatable :: h1c_b(:)
    type(rdmft_adam_t) :: adam
-   type(rdmft_ints_t) :: ints_b
    type(rdmft_orbs_t) :: orbs_b
 
    ABI_MALLOC(kpar,(orbs%nkpt))
@@ -731,7 +786,6 @@ contains
      call wrtout([ab_out,std_out],msg)
      nadam = 0
      orbs_b = orbs
-     ints_b = ints
      h1c_b = h1c
      hmat_b = hmat
      grad_b = grad
@@ -756,7 +810,6 @@ contains
          e_best = e_new
          improved = .true.
          orbs_b = orbs
-         ints_b = ints
          h1c_b = h1c
          hmat_b = hmat
          grad_b = grad
@@ -770,7 +823,6 @@ contains
      if (gconv .and. icall > 1) then
        e_best = e_prev
        orbs_b = orbs
-       ints_b = ints
        h1c_b = h1c
        hmat_b = hmat
        grad_b = grad
@@ -786,10 +838,12 @@ contains
        extra = 0
      end if
      orbs = orbs_b
-     ints = ints_b
      h1c = h1c_b
      hmat = hmat_b
      gmax = gmax_b
+     ! all the pairs of orbitals for the optimization of the occupations
+     call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
+                       dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,reduce=(dtset%rdmft_tr_reduce == 1))
      call sync_h1f()
      ! Occupations for the new orbitals
      t0 = abi_wtime()
@@ -823,7 +877,6 @@ contains
    call check_h()
    call adam%free()
    call orbs_b%free()
-   call ints_b%free()
    ABI_FREE(kpar)
    ABI_FREE(grad)
    ABI_FREE(grad_b)
@@ -853,7 +906,7 @@ contains
    type(rdmft_bg_t) :: bx
    real(dp),allocatable :: h1x(:),nx(:)
    call ix%compute(orbs_x,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
-                   dtset%rdmft_core_ints == 1,quiet=.true.)
+                   dtset%rdmft_core_ints == 1,quiet=.true.,reduce=(dtset%rdmft_tr_reduce == 1))
    ABI_MALLOC(h1x,(nf))
    ABI_MALLOC(nx,(nf))
    do jf=1,nf

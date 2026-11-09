@@ -394,7 +394,8 @@ subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,n0,ntarget,e
  eshift = zero
  if (present(e_shift)) eshift = e_shift
  if (talk) then
-   write(msg,'(2a)') ch10,' Occupation numbers, Newton-SQP:   iter     Etotal(Ha)       |step|        g.d       alpha    lambda  qp_ok'
+   write(msg,'(3a)') ch10,' Occupation numbers, Newton-SQP:   iter     Etotal(Ha)       |step|        g.d       alpha',&
+     '    lambda  qp_ok'
    call wrtout([ab_out,std_out],msg)
  end if
 
