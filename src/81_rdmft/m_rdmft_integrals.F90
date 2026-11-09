@@ -335,6 +335,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  !scalars
  integer,parameter :: izero0=0
  real(dp) :: tph,tpk
+ integer :: nblk,nloc,nrow
+ integer,allocatable :: fk(:),fb(:)
  integer :: jlo,jhi,cnt,comm_,ib,ierr,ik,iq,ip,jb,jk,jp,me,nb,nbj,nfft,nproc
  logical :: canon,fused,needk,red,wantf,isff,anybg
  integer :: ipb,iqb,pk
@@ -430,12 +432,10 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ! ------------------------------------------------------------------
  ! Coulomb integrals: rho_pp(G) of the free orbitals, sum of rho_qq(G) over the background orbitals
  ! ------------------------------------------------------------------
- ABI_MALLOC(rhog,(2,nfft,max(ints%nfree,1)))
  ABI_MALLOC(rbg,(2,nfft))
  ABI_MALLOC(rtmp,(2,nfft))
  ABI_MALLOC(vq,(2,nfft))
  rbg = zero
- rhog = zero
  qpt = zero
  call barevcoul(rcut_j,icutcoul_j,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc)
  vc(1) = zero   ! G=0 is the first element of the FFT mesh: neutralizing background
@@ -444,8 +444,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  cnt = 0
  tph = abi_wtime()
 
- ! The density of the orbital (n,-k) is the one of (n,k): the representative k-points are transformed and the density is
- ! copied to the partner (background orbitals count twice)
+ ! Background orbitals: sum of the densities (shared among the processes). The density of the orbital (n,-k) is the one
+ ! of (n,k): the representative k-points are transformed (background orbitals count twice)
  do ik=1,orbs%nkpt
    if (red .and. trk(ik) < ik) cycle
    wgt = one
@@ -453,60 +453,87 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    nb = orbs%nband(ik,1)
    do ib=1,nb
      ip = ints%offset(ik)+ib
-     if (.not.(free(ip) .or. bg(ip))) cycle
+     if (.not.bg(ip)) cycle
      cnt = cnt+1
      if (mod(cnt,nproc) /= me) cycle
      call orb_to_real_one(orbs,ik,ib,ngfft,mpi_enreg,ui1)
      prod(1,:) = ui1(1,:)**2+ui1(2,:)**2
      prod(2,:) = zero
-     if (free(ip)) then
-       call fourdp(2,rhog(:,:,ints%free_of(ip)),prod,-1,mpi_enreg,nfft,1,ngfft,0)
-       if (red .and. trk(ik) > ik) then
-         rhog(:,:,ints%free_of(ints%offset(trk(ik))+ib)) = rhog(:,:,ints%free_of(ip))
-       end if
-     else
-       call fourdp(2,rtmp,prod,-1,mpi_enreg,nfft,1,ngfft,0)
-       rbg = rbg+wgt*rtmp
-       ints%sjd = ints%sjd+wgt*sum(vc(:)*(rtmp(1,:)**2+rtmp(2,:)**2))/orbs%ucvol
-     end if
+     call fourdp(2,rtmp,prod,-1,mpi_enreg,nfft,1,ngfft,0)
+     rbg = rbg+wgt*rtmp
+     ints%sjd = ints%sjd+wgt*sum(vc(:)*(rtmp(1,:)**2+rtmp(2,:)**2))/orbs%ucvol
    end do
  end do
- ABI_FREE(ui1)
  rdmft_tint(1) = rdmft_tint(1)+abi_wtime()-tph
  tph = abi_wtime()
  if (nproc > 1) then
-   call xmpi_sum(rhog,comm_,ierr)
    call xmpi_sum(rbg,comm_,ierr)
    call xmpi_sum(ints%sjd,comm_,ierr)
  end if
-
  rdmft_tint(2) = rdmft_tint(2)+abi_wtime()-tph
  tph = abi_wtime()
- ! J_pq = Re sum_G conjg(rho_p) v rho_q / Omega, all the pairs with matrix products (blocks of columns shared among
- ! the processes)
- ABI_MALLOC(vrho,(2,nfft,max(ints%nfree,1)))
- do iq=1,ints%nfree
-   vrho(1,:,iq) = vc(:)*rhog(1,:,iq)
-   vrho(2,:,iq) = vc(:)*rhog(2,:,iq)
-   ints%bj(iq) = sum(vrho(1,:,iq)*rbg(1,:)+vrho(2,:,iq)*rbg(2,:))/orbs%ucvol
- end do
+
+ ! J_pq = Re sum_G conjg(rho_p) v rho_q / Omega. The densities of the free orbitals are never stored all at once: the columns
+ ! q of this process (a block of the free orbitals) are kept with the Coulomb kernel applied (vrho), the densities of the
+ ! rows p are computed block by block (by all the processes: a density costs one FFT, much less than the exchange
+ ! integrals, and no communication of the densities is needed).
  if (ints%nfree > 0) then
+   ! k-point and band of each free orbital; the representative of its time-reversal pair (the same density)
+   ABI_MALLOC(fk,(ints%nfree))
+   ABI_MALLOC(fb,(ints%nfree))
+   do iq=1,ints%nfree
+     jp = ints%comp_of(iq)
+     do ik=orbs%nkpt,1,-1
+       if (jp > ints%offset(ik)) exit
+     end do
+     fk(iq) = ik
+     fb(iq) = jp-ints%offset(ik)
+     if (red .and. trk(ik) < ik) fk(iq) = trk(ik)
+   end do
    jlo = (me*ints%nfree)/nproc+1
    jhi = ((me+1)*ints%nfree)/nproc
-   if (jhi >= jlo) then
-     ABI_MALLOC(jtmp,(2,ints%nfree,jhi-jlo+1))
-     call zgemm('C','N',ints%nfree,jhi-jlo+1,nfft,cone,rhog,nfft,vrho(1,1,jlo),nfft,czero,jtmp,ints%nfree)
-     ints%jint(:,jlo:jhi) = jtmp(1,:,:)/orbs%ucvol
-     ABI_FREE(jtmp)
+   nloc = max(jhi-jlo+1,0)
+   ABI_MALLOC(vrho,(2,nfft,max(nloc,1)))
+   do iq=jlo,jhi
+     call orb_to_real_one(orbs,fk(iq),fb(iq),ngfft,mpi_enreg,ui1)
+     prod(1,:) = ui1(1,:)**2+ui1(2,:)**2
+     prod(2,:) = zero
+     call fourdp(2,rtmp,prod,-1,mpi_enreg,nfft,1,ngfft,0)
+     vrho(1,:,iq-jlo+1) = vc(:)*rtmp(1,:)
+     vrho(2,:,iq-jlo+1) = vc(:)*rtmp(2,:)
+     ints%bj(iq) = sum(vrho(1,:,iq-jlo+1)*rbg(1,:)+vrho(2,:,iq-jlo+1)*rbg(2,:))/orbs%ucvol
+   end do
+   nblk = min(ints%nfree,128)
+   ABI_MALLOC(rhog,(2,nfft,nblk))
+   ABI_MALLOC(jtmp,(2,nblk,max(nloc,1)))
+   do jb=1,ints%nfree,nblk
+     nrow = min(nblk,ints%nfree-jb+1)
+     do ib=1,nrow
+       call orb_to_real_one(orbs,fk(jb+ib-1),fb(jb+ib-1),ngfft,mpi_enreg,ui1)
+       prod(1,:) = ui1(1,:)**2+ui1(2,:)**2
+       prod(2,:) = zero
+       call fourdp(2,rhog(:,:,ib),prod,-1,mpi_enreg,nfft,1,ngfft,0)
+     end do
+     if (nloc > 0) then
+       call zgemm('C','N',nrow,nloc,nfft,cone,rhog,nfft,vrho,nfft,czero,jtmp,nblk)
+       ints%jint(jb:jb+nrow-1,jlo:jhi) = jtmp(1,1:nrow,1:nloc)/orbs%ucvol
+     end if
+   end do
+   ABI_FREE(rhog)
+   ABI_FREE(jtmp)
+   ABI_FREE(vrho)
+   ABI_FREE(fk)
+   ABI_FREE(fb)
+   if (nproc > 1) then
+     call xmpi_sum(ints%bj,comm_,ierr)
+     call xmpi_sum(ints%jint,comm_,ierr)
    end if
-   if (nproc > 1) call xmpi_sum(ints%jint,comm_,ierr)
    ints%jint = half*(ints%jint+transpose(ints%jint))
  end if
- ABI_FREE(vrho)
+ ABI_FREE(ui1)
  rdmft_tint(3) = rdmft_tint(3)+abi_wtime()-tph
  ! Background-background pairs: |sum_q rho_q|^2 contains the diagonal terms
  ints%sjo = sum(vc(:)*(rbg(1,:)**2+rbg(2,:)**2))/orbs%ucvol-ints%sjd
- ABI_FREE(rhog)
  ABI_FREE(rbg)
  ABI_FREE(rtmp)
  ABI_FREE(vq)
