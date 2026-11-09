@@ -63,6 +63,9 @@ module m_rdmft_orbitals
    integer :: mband = 0
    ! Maximum number of bands over k-points.
 
+   real(dp) :: ecut = zero
+   ! ecut (input variable) of the ground-state calculation that wrote the WFK file.
+
    integer :: mpw = 0
    ! Maximum number of plane waves over k-points.
 
@@ -253,6 +256,7 @@ subroutine rdmft_orbs_read_wfk(orbs,wfk_path)
  orbs%mband = maxval(hdr%nband)
  orbs%mpw = maxval(hdr%npwarr)
  orbs%nelect = hdr%nelect
+ orbs%ecut = hdr%ecut
  orbs%rprimd(:,:) = hdr%rprimd(:,:)
  call metric(orbs%gmet,gprimd,-1,rmet,orbs%rprimd,orbs%ucvol)
 

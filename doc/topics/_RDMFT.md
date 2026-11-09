@@ -177,7 +177,7 @@ is to start from PBE orbitals with the SD functional: the energy tends to the Ha
 The orbitals, and therefore the occupations and the rotations of the orbitals, are those of the bands stored in the WFK file
 of the ground-state calculation: the [[nband]] of the RDMFT dataset is ignored. The cutoff [[ecut]] (together with the cell, the
 k-points and the pseudopotentials) must be the one of the ground-state calculation: it fixes the plane-wave basis in which
-the orbitals are expanded, the FFT mesh of the pair densities and the one-electron operator. The number of
+the orbitals are expanded, the FFT mesh of the pair densities and the one-electron operator. The code stops with an error if [[ecut]] differs from the value in the header of the WFK file. The number of
 states that [[ecut]] can produce, however, is the number of plane waves (hundreds per k-point even for a small cell), and
 the WFK file usually contains only a few of them. All the Coulomb and exchange integrals are computed exactly for the
 loaded orbitals, but the minimization is restricted to the space they span: the energies are variational upper

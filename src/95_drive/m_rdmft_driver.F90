@@ -150,6 +150,14 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
 
  !Read the orbitals
  call orbs%read_wfk(wfk_path)
+ !The plane-wave basis of the orbitals is the one of the ground-state calculation: ecut must be the same
+ if (abs(orbs%ecut-dtset%ecut) > tol8) then
+   write(msg,'(2(a,es14.6),3a)') 'RDMFT: ecut = ',dtset%ecut,' in the RDMFT dataset but ',orbs%ecut,&
+     ' in the ground-state WFK file. The cutoff (as well as the cell, the k-points and the pseudopotentials) must be those',&
+     ' of the ground-state calculation: the orbitals are expanded in its plane-wave basis, and the FFT mesh and the',&
+     ' one-electron operator depend on it.'
+   ABI_ERROR(msg)
+ end if
  if (dtset%rdmft_complete == 1) then
    call orbs%complete_basis(nadded)
    write(msg,'(2a,i0,a,i0,a)') ch10,' RDMFT: rdmft_complete = 1, bands added to complete the plane-wave basis of each k-point: ',&
