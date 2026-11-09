@@ -936,7 +936,7 @@ contains
    integer,intent(in) :: kpar(:)
    real(dp),intent(out) :: e_out,gmax
    complex(dpc),intent(out) :: grad(:)
-   integer :: ib2,jk,ipar,pp,qq,nb2,nbmax
+   integer :: ib2,iq2,jk,ipar,pp,qq,nb2,nbmax,ncol,nrmax,nrow
    real(dp) :: fac
    logical,allocatable :: relev(:)
    complex(dpc) :: dg
@@ -945,39 +945,66 @@ contains
    type(rdmft_fockreq_t) :: req
    nbmax = maxval(orbs%nband(:,1))
    ABI_MALLOC(req%want,(orbs%nkpt))
-   ABI_MALLOC(req%ccoef,(nbmax,nbk,orbs%nkpt))
    ABI_MALLOC(req%fx,(nbmax,nbmax,orbs%nkpt))
-   req%ccoef = zero
    req%want = (kpar >= 0)
    ABI_MALLOC(relev,(nbk))
+   ! An orbital is relevant if its largest coupling (coefficient of the energy, in electrons) reaches the threshold; the
+   ! couplings are symmetric, so the row of each band gives its relevance. The dropped couplings are set to zero.
    do jk=1,orbs%nkpt
      nb2 = orbs%nband(jk,1)
      ABI_MALLOC(acf,(nb2,nbk))
      ABI_MALLOC(ccf,(nb2,nbk))
      ABI_MALLOC(nux,(nb2))
      call build_coefs(jk,acf,ccf,nux)
-     ! An orbital is relevant if its largest coupling (coefficient of the energy, in electrons) reaches the threshold; the
-     ! couplings are symmetric, so the row of each band gives its relevance. The dropped couplings are set to zero.
      do ib2=1,nb2
        relev(offset(jk)+ib2) = (nk2*max(maxval(abs(acf(ib2,:))),maxval(abs(ccf(ib2,:)))) >= dtset%rdmft_occ_skip)
      end do
-     if (kpar(jk) >= 0) then
-       ! the rows of the orbitals without couplings are dropped as well (the one-electron term is kept by the caller)
-       do ib2=1,nb2
-         if (.not.relev(offset(jk)+ib2)) ccf(ib2,:) = zero
-       end do
-       req%ccoef(1:nb2,:,jk) = ccf
-     end if
      ABI_FREE(acf)
      ABI_FREE(ccf)
      ABI_FREE(nux)
    end do
+   ! The couplings are stored only between relevant bands (rows) and relevant orbitals (columns): the memory does not grow
+   ! with the square of the number of orbitals of the complete basis
+   ABI_MALLOC(req%rowmap,(nbmax,orbs%nkpt))
+   ABI_MALLOC(req%colmap,(nbk))
+   req%rowmap = 0
+   req%colmap = 0
+   ncol = 0
+   do ib2=1,nbk
+     if (relev(ib2)) then
+       ncol = ncol+1
+       req%colmap(ib2) = ncol
+     end if
+   end do
+   nrmax = 0
+   do jk=1,orbs%nkpt
+     nrow = 0
+     do ib2=1,orbs%nband(jk,1)
+       if (relev(offset(jk)+ib2)) then
+         nrow = nrow+1
+         req%rowmap(ib2,jk) = nrow
+       end if
+     end do
+     nrmax = max(nrmax,nrow)
+   end do
+   ABI_MALLOC(req%ccoef,(max(nrmax,1),max(ncol,1),orbs%nkpt))
+   req%ccoef = zero
    do jk=1,orbs%nkpt
      if (kpar(jk) < 0) cycle
      nb2 = orbs%nband(jk,1)
-     do ib2=1,nbk
-       if (.not.relev(ib2)) req%ccoef(1:nb2,ib2,jk) = zero
+     ABI_MALLOC(acf,(nb2,nbk))
+     ABI_MALLOC(ccf,(nb2,nbk))
+     ABI_MALLOC(nux,(nb2))
+     call build_coefs(jk,acf,ccf,nux)
+     do ib2=1,nb2
+       if (req%rowmap(ib2,jk) == 0) cycle
+       do iq2=1,nbk
+         if (req%colmap(iq2) > 0) req%ccoef(req%rowmap(ib2,jk),req%colmap(iq2),jk) = ccf(ib2,iq2)
+       end do
      end do
+     ABI_FREE(acf)
+     ABI_FREE(ccf)
+     ABI_FREE(nux)
    end do
    nrel_last = count(relev)
    t0 = abi_wtime()
@@ -1044,6 +1071,8 @@ contains
    ABI_FREE(relev)
    ABI_FREE(req%want)
    ABI_FREE(req%ccoef)
+   ABI_FREE(req%rowmap)
+   ABI_FREE(req%colmap)
    ABI_FREE(req%fx)
  end subroutine eval_point
 

@@ -73,7 +73,11 @@ module m_rdmft_integrals
    logical,allocatable :: want(:)
    ! want(nkpt): the exchange part of F is built for this k-point
    real(dp),allocatable :: ccoef(:,:,:)
-   ! ccoef(nbmax,nbk,nkpt): c_jq (divided by N_k^2) for the bands j of the k-point and all the orbitals q
+   ! ccoef(nrow,ncol,nkpt): c_jq (divided by N_k^2) between the relevant bands j of the k-point and the relevant orbitals q
+   integer,allocatable :: rowmap(:,:)
+   ! rowmap(nbmax,nkpt): row of ccoef of each band of each k-point (0 = no coupling)
+   integer,allocatable :: colmap(:)
+   ! colmap(nbk): column of ccoef of each orbital (0 = no coupling)
    complex(dpc),allocatable :: fx(:,:,:)
    ! fx(nbmax,nbmax,nkpt): exchange part of F_pj (output)
  end type rdmft_fockreq_t
@@ -587,7 +591,10 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          if (present(rel) .and. needk) needk = rel(ip)
          ! Exchange part of the Fock matrix of this pair: only if the coupling is not zero
          wf = wantf
-         if (wf) wf = (req%ccoef(ib,iq,ik) /= zero)
+         if (wf) then
+           wf = (req%rowmap(ib,ik) > 0 .and. req%colmap(iq) > 0)
+           if (wf) wf = (req%ccoef(req%rowmap(ib,ik),req%colmap(iq),ik) /= zero)
+         end if
          if (.not.(needk .or. wf)) cycle
          ! conjg(u_i) u_j
          tpk = abi_wtime()
@@ -603,7 +610,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
            ! F_pj = 1/nfft sum_r u_p(r) W_j(r), W_j(r) = sum_q conjg(u_q(r)) b_jq(r), b_jq = inverse FFT of Y_jq
            ! (accumulated over k' and q, one ZGEMM per k-point at the end)
            tpk = abi_wtime()
-           fcy = -two*req%ccoef(ib,iq,ik)/orbs%ucvol
+           fcy = -two*req%ccoef(req%rowmap(ib,ik),req%colmap(iq),ik)/orbs%ucvol
            yk(1,:) = fcy*vc(:)*pgrid(1,:)
            yk(2,:) = fcy*vc(:)*pgrid(2,:)
            call fourdp(2,yk,wrs,+1,mpi_enreg,nfft,1,ngfft,0)
