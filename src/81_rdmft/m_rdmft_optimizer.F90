@@ -45,6 +45,15 @@ module m_rdmft_optimizer
  public :: rdmft_optimize_pnof
 !!***
 
+ !> Inverse of the KKT matrix of the free variables of the QP (plus the equality constraint, index n+1), stored with the
+ !> indices of all the variables (zero for the variables at a bound), kept up to date when a variable is fixed or freed
+ type kkt_inc_t
+   logical :: valid = .false.
+   integer :: nupd = 0
+   logical,allocatable :: fr(:)
+   real(dp),allocatable :: minv(:,:)
+ end type kkt_inc_t
+
 contains
 !!***
 
@@ -216,6 +225,270 @@ subroutine qp_given_fixed(n,bmat,g,a,status,fixed_value,d,rgrad)
 end subroutine qp_given_fixed
 !!***
 
+!!****f* m_rdmft_optimizer/kkt_build
+!! NAME
+!!  kkt_build
+!!
+!! FUNCTION
+!!  Build the inverse of the KKT matrix [B_FF a_F; a_F^T 0] of the free variables F (status = 0) from scratch (LU).
+!!
+!! SOURCE
+
+subroutine kkt_build(st,n,bmat,a,status,ok)
+
+ !Arguments ------------------------------------
+ integer,intent(in) :: n
+ type(kkt_inc_t),intent(inout) :: st
+ logical,intent(out) :: ok
+ integer,intent(in) :: status(n)
+ real(dp),intent(in) :: bmat(n,n),a(n)
+
+ !Local variables-------------------------------
+ integer :: i,info,j,jj,kk,mm,nf
+ real(dp) :: tmp
+ integer,allocatable :: fidx(:),idx(:),ipiv(:)
+ real(dp),allocatable :: kkt(:,:),colscale(:),work(:)
+
+! *************************************************************************
+
+ ok = .false.
+ st%valid = .false.
+ st%nupd = 0
+ if (.not.allocated(st%fr)) then
+   ABI_MALLOC(st%fr,(n))
+   ABI_MALLOC(st%minv,(n+1,n+1))
+ end if
+ ABI_MALLOC(fidx,(n))
+ nf = 0
+ do i=1,n
+   if (status(i) == 0) then
+     nf = nf+1; fidx(nf) = i
+   end if
+ end do
+ st%fr = (status == 0)
+ st%minv = zero
+ if (nf == 0) then
+   ABI_FREE(fidx)
+   return
+ end if
+ mm = nf+1
+ ABI_MALLOC(kkt,(mm,mm))
+ ABI_MALLOC(colscale,(mm))
+ ABI_MALLOC(ipiv,(mm))
+ ABI_MALLOC(idx,(mm))
+ ABI_MALLOC(work,(64*mm))
+ idx(1:nf) = fidx(1:nf)
+ idx(mm) = n+1
+ kkt = zero
+ do jj=1,nf
+   j = fidx(jj)
+   do kk=1,nf
+     kkt(jj,kk) = bmat(j,fidx(kk))
+   end do
+   kkt(jj,mm) = a(j)
+   kkt(mm,jj) = a(j)
+ end do
+ do kk=1,mm
+   colscale(kk) = max(maxval(abs(kkt(:,kk))),tiny(one))
+ end do
+ call dgetrf(mm,mm,kkt,mm,ipiv,info)
+ ok = (info == 0)
+ if (ok) then
+   do kk=1,mm
+     tmp = abs(kkt(kk,kk))
+     if (tmp <= 1.0e-14_dp*colscale(kk) .or. tmp /= tmp) ok = .false.
+   end do
+ end if
+ if (ok) then
+   call dgetri(mm,kkt,mm,ipiv,work,64*mm,info)
+   ok = (info == 0)
+ end if
+ if (ok) then
+   do kk=1,mm
+     do jj=1,mm
+       st%minv(idx(jj),idx(kk)) = kkt(jj,kk)
+     end do
+   end do
+   st%valid = .true.
+ end if
+ ABI_FREE(fidx)
+ ABI_FREE(kkt)
+ ABI_FREE(colscale)
+ ABI_FREE(ipiv)
+ ABI_FREE(idx)
+ ABI_FREE(work)
+
+end subroutine kkt_build
+!!***
+
+!!****f* m_rdmft_optimizer/kkt_update
+!! NAME
+!!  kkt_update
+!!
+!! FUNCTION
+!!  Update the inverse of the KKT matrix when the variable j is fixed (removed: Schur complement of the inverse) or
+!!  freed (added: bordering formula). O(n^2) instead of the O(n^3) of a new factorization.
+!!
+!! SOURCE
+
+subroutine kkt_update(st,n,bmat,a,j,ok)
+
+ !Arguments ------------------------------------
+ integer,intent(in) :: n,j
+ type(kkt_inc_t),intent(inout) :: st
+ logical,intent(out) :: ok
+ real(dp),intent(in) :: bmat(n,n),a(n)
+
+ !Local variables-------------------------------
+ integer :: i,n1
+ real(dp) :: piv,s,uw
+ real(dp),allocatable :: u(:),w(:)
+
+! *************************************************************************
+
+ n1 = n+1
+ ok = .false.
+ ABI_MALLOC(u,(n1))
+ ABI_MALLOC(w,(n1))
+ if (st%fr(j)) then
+   ! j leaves the free set: Minv <- Minv - Minv(:,j) Minv(j,:) / Minv(j,j) (symmetric matrix)
+   piv = st%minv(j,j)
+   if (abs(piv) > 1.0e-10_dp*max(maxval(abs(st%minv(:,j))),tiny(one)) .and. piv == piv) then
+     w = st%minv(:,j)
+     call dger(n1,n1,-one/piv,w,1,w,1,st%minv,n1)
+     st%minv(:,j) = zero
+     st%minv(j,:) = zero
+     st%fr(j) = .false.
+     ok = .true.
+   end if
+ else
+   ! j enters the free set: u = [B_Fj; a_j], s = B_jj - u^T Minv u
+   u = zero
+   do i=1,n
+     if (st%fr(i)) u(i) = bmat(i,j)
+   end do
+   u(n1) = a(j)
+   call dgemv('N',n1,n1,one,st%minv,n1,u,1,zero,w,1)
+   uw = sum(u*w)
+   s = bmat(j,j)-uw
+   if (abs(s) > 1.0e-10_dp*(abs(bmat(j,j))+abs(uw)) .and. s == s) then
+     call dger(n1,n1,one/s,w,1,w,1,st%minv,n1)
+     st%minv(:,j) = -w/s
+     st%minv(j,:) = -w/s
+     st%minv(j,j) = one/s
+     st%fr(j) = .true.
+     ok = .true.
+   end if
+ end if
+ if (ok) st%nupd = st%nupd+1
+ ABI_FREE(u)
+ ABI_FREE(w)
+
+end subroutine kkt_update
+!!***
+
+!!****f* m_rdmft_optimizer/qp_given_fixed_inc
+!! NAME
+!!  qp_given_fixed_inc
+!!
+!! FUNCTION
+!!  Same as qp_given_fixed (without damping) with the inverse of the KKT matrix of the free variables kept up to date
+!!  between the calls. ok = false if the matrix is (nearly) singular or the solution is not accurate: the caller then uses
+!!  qp_given_fixed.
+!!
+!! SOURCE
+
+subroutine qp_given_fixed_inc(st,n,bmat,g,a,status,fixed_value,d,rgrad,ok)
+
+ !Arguments ------------------------------------
+ integer,intent(in) :: n
+ type(kkt_inc_t),intent(inout) :: st
+ logical,intent(out) :: ok
+ integer,intent(in) :: status(n)
+ real(dp),intent(in) :: bmat(n,n),g(n),a(n),fixed_value(n)
+ real(dp),intent(out) :: d(n),rgrad(n)
+
+ !Local variables-------------------------------
+ integer :: attempt,i,n1
+ real(dp) :: lambda,res,scale
+ logical :: ok1
+ real(dp),allocatable :: dfix(:),rhsf(:),solf(:),tmp(:),tmp2(:)
+
+! *************************************************************************
+
+ n1 = n+1
+ ok = .true.
+ if (.not.st%valid) call kkt_build(st,n,bmat,a,status,ok)
+ if (ok .and. st%valid) then
+   do i=1,n
+     if ((status(i) == 0) .neqv. st%fr(i)) then
+       call kkt_update(st,n,bmat,a,i,ok1)
+       if (.not.ok1) then
+         call kkt_build(st,n,bmat,a,status,ok)
+         exit
+       end if
+     end if
+   end do
+   if (ok .and. st%nupd > 100) call kkt_build(st,n,bmat,a,status,ok)
+ end if
+ if (.not.(ok .and. st%valid)) then
+   ok = .false.
+   st%valid = .false.
+   return
+ end if
+
+ ABI_MALLOC(dfix,(n))
+ ABI_MALLOC(rhsf,(n1))
+ ABI_MALLOC(solf,(n1))
+ ABI_MALLOC(tmp,(n))
+ ABI_MALLOC(tmp2,(n))
+ do attempt=1,2
+   dfix = zero
+   do i=1,n
+     if (status(i) /= 0) dfix(i) = fixed_value(i)
+   end do
+   call dgemv('N',n,n,one,bmat,n,dfix,1,zero,tmp,1)
+   rhsf = zero
+   do i=1,n
+     if (st%fr(i)) rhsf(i) = -(g(i)+tmp(i))
+   end do
+   rhsf(n1) = -sum(a*dfix)
+   call dgemv('N',n1,n1,one,st%minv,n1,rhsf,1,zero,solf,1)
+   ! residual of the KKT system on the free variables
+   lambda = solf(n1)
+   call dgemv('N',n,n,one,bmat,n,solf,1,zero,tmp2,1)
+   res = abs(sum(a(1:n)*solf(1:n))-rhsf(n1))
+   do i=1,n
+     if (st%fr(i)) res = max(res,abs(tmp2(i)+a(i)*lambda-rhsf(i)))
+   end do
+   scale = max(one,maxval(abs(rhsf)))
+   if (res <= 1.0e-9_dp*scale) exit
+   ! inaccurate inverse: new factorization, once
+   ok = .false.
+   if (attempt == 1) call kkt_build(st,n,bmat,a,status,ok)
+   if (.not.ok) exit
+ end do
+ if (ok) then
+   d = dfix
+   do i=1,n
+     if (st%fr(i)) d(i) = solf(i)
+   end do
+   call dgemv('N',n,n,one,bmat,n,d,1,zero,tmp,1)
+   do i=1,n
+     rgrad(i) = g(i)+tmp(i)-a(i)*lambda
+   end do
+ else
+   st%valid = .false.
+ end if
+ ABI_FREE(dfix)
+ ABI_FREE(rhsf)
+ ABI_FREE(solf)
+ ABI_FREE(tmp)
+ ABI_FREE(tmp2)
+
+end subroutine qp_given_fixed_inc
+!!***
+
 !!****f* m_rdmft_optimizer/qp_box_eq
 !! NAME
 !!  qp_box_eq
@@ -245,6 +518,8 @@ subroutine qp_box_eq(n,bmat,g,a,lb,ub,d,converged)
  real(dp) :: alpha,cand,tolm,worst_violation
  !arrays
  integer,allocatable :: status(:)
+ logical :: ok_inc
+ type(kkt_inc_t) :: st
  real(dp),allocatable :: dsol(:),fixed_value(:),p(:),rgrad(:)
 
 ! *************************************************************************
@@ -266,7 +541,8 @@ subroutine qp_box_eq(n,bmat,g,a,lb,ub,d,converged)
      if (status(i) == -1) fixed_value(i) = lb(i)
      if (status(i) == 1) fixed_value(i) = ub(i)
    end do
-   call qp_given_fixed(n,bmat,g,a,status,fixed_value,dsol,rgrad)
+   call qp_given_fixed_inc(st,n,bmat,g,a,status,fixed_value,dsol,rgrad,ok_inc)
+   if (.not.ok_inc) call qp_given_fixed(n,bmat,g,a,status,fixed_value,dsol,rgrad)
    p = dsol-d
 
    if (sqrt(sum(p**2)) <= tolz) then
@@ -319,6 +595,8 @@ subroutine qp_box_eq(n,bmat,g,a,lb,ub,d,converged)
  end do
 
  ABI_FREE(status)
+ ABI_SFREE(st%fr)
+ ABI_SFREE(st%minv)
  ABI_FREE(dsol)
  ABI_FREE(fixed_value)
  ABI_FREE(p)
