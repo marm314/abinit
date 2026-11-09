@@ -1016,6 +1016,93 @@ contains
    ABI_FREE(req%fx)
  end subroutine eval_point
 
+ subroutine spot_check(kpar)
+   ! Check of rdmft_occ_skip: the orbital gradient of the first independent k-point computed with all the partners and with the
+   ! skipping (cost of the order of one sweep over the partners of one k-point)
+   integer,intent(in) :: kpar(:)
+   integer :: ib2,jk,k0,nb2,pp,qq
+   real(dp) :: fac,gall,gskip,gdiff
+   complex(dpc) :: dg,ga,gs
+   logical,allocatable :: relv(:)
+   real(dp),allocatable :: acf(:,:),ccf(:,:),acs(:,:),ccs(:,:),nux(:)
+   complex(dpc),allocatable :: fa(:,:),fs(:,:)
+   k0 = 0
+   do jk=1,orbs%nkpt
+     if (kpar(jk) >= 0) then
+       k0 = jk
+       exit
+     end if
+   end do
+   if (k0 == 0) return
+   ABI_MALLOC(relv,(nbk))
+   do jk=1,orbs%nkpt
+     nb2 = orbs%nband(jk,1)
+     ABI_MALLOC(acf,(nb2,nbk))
+     ABI_MALLOC(ccf,(nb2,nbk))
+     ABI_MALLOC(nux,(nb2))
+     call build_coefs(jk,acf,ccf,nux)
+     do ib2=1,nb2
+       relv(offset(jk)+ib2) = (nk2*max(maxval(abs(acf(ib2,:))),maxval(abs(ccf(ib2,:)))) >= dtset%rdmft_occ_skip)
+     end do
+     ABI_FREE(acf)
+     ABI_FREE(ccf)
+     ABI_FREE(nux)
+   end do
+   nb2 = orbs%nband(k0,1)
+   ABI_MALLOC(acf,(nb2,nbk))
+   ABI_MALLOC(ccf,(nb2,nbk))
+   ABI_MALLOC(acs,(nb2,nbk))
+   ABI_MALLOC(ccs,(nb2,nbk))
+   ABI_MALLOC(nux,(nb2))
+   ABI_MALLOC(fa,(nb2,nb2))
+   ABI_MALLOC(fs,(nb2,nb2))
+   call build_coefs(k0,acf,ccf,nux)
+   acs = acf
+   ccs = ccf
+   do ib2=1,nbk
+     if (.not.relv(ib2)) then
+       acs(:,ib2) = zero
+       ccs(:,ib2) = zero
+     end if
+   end do
+   call rdmft_gen_fock_k(orbs,k0,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
+                         offset,nbk,hmat(1:nb2,1:nb2,k0),nux,acf,ccf,xmpi_world,fa)
+   call rdmft_gen_fock_k(orbs,k0,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
+                         offset,nbk,hmat(1:nb2,1:nb2,k0),nux,acs,ccs,xmpi_world,fs)
+   fac = one
+   if (orbs%tr_k(k0) > 0 .and. orbs%tr_k(k0) /= k0) fac = two
+   gall = zero
+   gskip = zero
+   gdiff = zero
+   do pp=1,nb2
+     do qq=pp+1,nb2
+       dg = fa(pp,qq)-conjg(fa(qq,pp))
+       ga = fac*cmplx(two*real(dg,dp),-two*aimag(dg),kind=dpc)
+       dg = fs(pp,qq)-conjg(fs(qq,pp))
+       gs = fac*cmplx(two*real(dg,dp),-two*aimag(dg),kind=dpc)
+       if (orbs%tr_k(k0) == k0) then
+         ga = cmplx(real(ga,dp),zero,kind=dpc)
+         gs = cmplx(real(gs,dp),zero,kind=dpc)
+       end if
+       gall = max(gall,abs(ga))
+       gskip = max(gskip,abs(gs))
+       gdiff = max(gdiff,abs(ga-gs))
+     end do
+   end do
+   write(msg,'(a,i0,a,es10.2,a,es10.2,a,es10.2,a,i0,a,i0,a)') ' RDMFT: check of rdmft_occ_skip at the k-point ',k0,&
+     ': max|g| with all the pairs = ',gall,', with the skipping = ',gskip,', largest difference = ',gdiff,&
+     ' (orbitals kept in the sums: ',count(relv),' of ',nbk,')'
+   call wrtout([ab_out,std_out],msg)
+   ABI_FREE(relv)
+   ABI_FREE(acf)
+   ABI_FREE(ccf)
+   ABI_FREE(acs)
+   ABI_FREE(ccs)
+   ABI_FREE(nux)
+   ABI_FREE(fa)
+   ABI_FREE(fs)
+ end subroutine spot_check
+
  subroutine orbital_macro(e_start)
    ! Macro-iterations: ADAM rotation of the orbitals at fixed occupations, then optimization of the occupations
    real(dp),intent(in) :: e_start
@@ -1168,6 +1255,7 @@ contains
    write(msg,'(a,5(a,f9.2))') ' RDMFT: timings (s):',' ints+Fock exchange =',tm(1),', energy =',tm(2),', Hartree Fock =',tm(3),&
      ', rotation =',tm(4),', occupations =',tm(5)
    call wrtout([ab_out,std_out],msg)
+   if (dtset%rdmft_occ_skip > zero) call spot_check(kpar)
    call check_h()
    call adam%free()
    call orbs_b%free()
