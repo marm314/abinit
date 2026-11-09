@@ -36,7 +36,7 @@ module m_rdmft_driver
  use m_hdr,               only : hdr_type
  use m_ioarr,             only : fftdatar_write
  use m_io_tools,          only : get_unit, open_file
- use m_nctk,              only : nctk_try_fort_or_ncfile
+ use m_nctk,              only : nctk_ncify, nctk_try_fort_or_ncfile
  use m_pawfgr,            only : pawfgr_type, pawfgr_init, pawfgr_destroy
  use m_pawrad,            only : pawrad_type
  use m_pawtab,            only : pawtab_type
@@ -1487,6 +1487,7 @@ contains
    real(dp),allocatable :: eig_w(:,:),occ_w(:,:),rho_w(:,:)
    type(hdr_type) :: hdr_w
    type(crystal_t) :: cryst_w
+   character(len=fnlen) :: wfk_out,den_out
    ABI_MALLOC(eig_w,(orbs%mband,orbs%nkpt))
    ABI_MALLOC(occ_w,(orbs%mband,orbs%nkpt))
    eig_w = zero
@@ -1498,11 +1499,17 @@ contains
    end do
    ABI_MALLOC(rho_w,(nfftf,1))
    if (dtset%prtden > 0) call compute_density(nfull,rho_w(:,1))
+   wfk_out = dtfil%fnameabo_wfk
+   den_out = dtfil%fnameabo_den
+   if (dtset%iomode == IO_MODE_ETSF) then
+     wfk_out = nctk_ncify(wfk_out)
+     den_out = nctk_ncify(den_out)
+   end if
    if (xmpi_comm_rank(xmpi_world) == master) then
      call orbs%make_hdr(hdr_w,occ_w)
      if (dtset%prtwf > 0) then
        call orbs%write_wfk(dtfil%fnameabo_wfk,dtset%iomode,hdr_w,eig_w,occ_w)
-       write(msg,'(2a)') ch10,' RDMFT: natural orbitals written to '//trim(dtfil%fnameabo_wfk)//&
+       write(msg,'(2a)') ch10,' RDMFT: natural orbitals written to '//trim(wfk_out)//&
          ' (occupations 2n; the eigenvalues are the diagonal elements of the one-electron Hamiltonian)'
        call wrtout([ab_out,std_out],msg)
      end if
@@ -1511,7 +1518,7 @@ contains
        cryst_w = hdr_w%get_crystal()
        call fftdatar_write("density",dtfil%fnameabo_den,dtset%iomode,hdr_w,cryst_w,ngfftf,1,nfftf,1,rho_w,mpi_seq)
        call cryst_w%free()
-       write(msg,'(2a)') ch10,' RDMFT: density of the natural orbitals written to '//trim(dtfil%fnameabo_den)
+       write(msg,'(2a)') ch10,' RDMFT: density of the natural orbitals written to '//trim(den_out)
        call wrtout([ab_out,std_out],msg)
      end if
      call hdr_w%free()
