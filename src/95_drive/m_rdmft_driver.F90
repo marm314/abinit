@@ -694,8 +694,18 @@ contains
        end if
        de = e_new-e_prev
        e_prev = e_new
-       if (icall > 1 .and. abs(de) < dtset%rdmft_orb_etol) exit
+       if (icall > 1 .and. abs(de) < tol14) exit
      end do
+     ! A run that ends on the gradient criterion keeps its last point (stationary), even if its energy equals the best one
+     if (gconv .and. icall > 1) then
+       e_best = e_prev
+       orbs_b = orbs
+       ints_b = ints
+       h1c_b = h1c
+       hmat_b = hmat
+       grad_b = grad
+       gmax_b = gmax
+     end if
      ! No improvement although the energy still moves: restart from the best point with a smaller learning rate
      restart = (.not.improved .and. .not.gconv .and. abs(de) > dtset%rdmft_orb_etol)
      if (restart) then
@@ -723,7 +733,7 @@ contains
      call wrtout([ab_out,std_out],msg)
      nstall = merge(nstall+1,0,abs(e_new-e_old) < dtset%rdmft_orb_etol)
      mi = imac
-     if (abs(e_new-e_old) < dtset%rdmft_orb_etol .and. (.not.restart .or. gconv)) then
+     if (abs(e_new-e_old) < dtset%rdmft_orb_etol .and. gmax < dtset%rdmft_orb_gtol .and. (.not.restart .or. gconv)) then
        e_old = e_new
        exit
      end if

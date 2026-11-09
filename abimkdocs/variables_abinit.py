@@ -19991,12 +19991,12 @@ Variable(
     vartype="real",
     topics=["RDMFT_useful"],
     dimensions="scalar",
-    defaultval=1.0e-5,
+    defaultval=1.0e-6,
     mnemonics="Reduced Density Matrix Functional Theory: ORBital optimization Gradient TOLerance",
     characteristics=["[[DEVELOP]]"],
     added_in_version="10.9.3",
     text=r"""
-Largest modulus of the orbital gradient below which an ADAM run of [[rdmft_orb_macro]] is stopped.
+Largest modulus of the orbital gradient below which an ADAM run of [[rdmft_orb_macro]] is stopped. The macro-iterations are converged when, in addition, the energy changes by less than [[rdmft_orb_etol]].
 """,
 ),
 

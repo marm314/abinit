@@ -2856,7 +2856,7 @@ subroutine indefo(dtsets, ndtset_alloc, nprocs)
    dtsets(idtset)%rdmft_adam_iter=10
    dtsets(idtset)%rdmft_adam_lr=0.01_dp
    dtsets(idtset)%rdmft_orb_etol=1.0e-9_dp
-   dtsets(idtset)%rdmft_orb_gtol=1.0e-5_dp
+   dtsets(idtset)%rdmft_orb_gtol=1.0e-6_dp
    dtsets(idtset)%rdmft_functional=0
    dtsets(idtset)%rdmft_ncoupl=2
    dtsets(idtset)%rdmft_nocc_act=0
