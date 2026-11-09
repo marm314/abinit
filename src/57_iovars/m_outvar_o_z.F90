@@ -908,7 +908,7 @@ contains
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_lr','DPR',0)
 
  dprarr(1,:)=dtsets(:)%rdmft_orb_etol
- call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_orb_etol','DPR',0)
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_orb_etol','ENE',0)
 
  dprarr(1,:)=dtsets(:)%rdmft_orb_gtol
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_orb_gtol','DPR',0)
@@ -919,11 +919,11 @@ contains
  intarr(1,:)=dtsets(:)%rdmft_adam_maxit
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_maxit','INT',0)
 
- dprarr(1,:)=dtsets(:)%rdmft_adam_beta1
- call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_beta1','DPR',0)
+ dprarr(1,:)=dtsets(:)%rdmft_adam_betam
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_betam','DPR',0)
 
- dprarr(1,:)=dtsets(:)%rdmft_adam_beta2
- call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_beta2','DPR',0)
+ dprarr(1,:)=dtsets(:)%rdmft_adam_betav
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_betav','DPR',0)
 
  dprarr(1,:)=dtsets(:)%rdmft_adam_rate
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_rate','DPR',0)

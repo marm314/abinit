@@ -19978,7 +19978,7 @@ Variable(
     dimensions="scalar",
     defaultval=1.0e-9,
     mnemonics="Reduced Density Matrix Functional Theory: ORBital optimization Energy TOLerance",
-    characteristics=["[[DEVELOP]]"],
+    characteristics=["[[DEVELOP]]", "[[ENERGY]]"],
     added_in_version="10.9.3",
     text=r"""
 Energy change (Ha) below which the macro-iterations of [[rdmft_orb_macro]] are converged.
@@ -20031,13 +20031,13 @@ Largest number of ADAM iterations of one run of [[rdmft_orb_macro]]; beyond it t
 ),
 
 Variable(
-    abivarname="rdmft_adam_beta1",
+    abivarname="rdmft_adam_betam",
     varset="dev",
     vartype="real",
     topics=["RDMFT_useful"],
     dimensions="scalar",
     defaultval=0.7,
-    mnemonics="Reduced Density Matrix Functional Theory: ADAM BETA1",
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM BETA for the first Moment",
     characteristics=["[[DEVELOP]]"],
     added_in_version="10.9.3",
     text=r"""
@@ -20046,13 +20046,13 @@ Decay rate of the first moment (complex) of the orbital gradient in the ADAM opt
 ),
 
 Variable(
-    abivarname="rdmft_adam_beta2",
+    abivarname="rdmft_adam_betav",
     varset="dev",
     vartype="real",
     topics=["RDMFT_useful"],
     dimensions="scalar",
     defaultval=0.9,
-    mnemonics="Reduced Density Matrix Functional Theory: ADAM BETA2",
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM BETA for the second moment (Variance)",
     characteristics=["[[DEVELOP]]"],
     added_in_version="10.9.3",
     text=r"""

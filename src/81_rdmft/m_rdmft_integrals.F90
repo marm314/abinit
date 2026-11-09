@@ -39,6 +39,7 @@ module m_rdmft_integrals
  use m_mpinfo,           only : destroy_mpi_enreg, initmpi_seq
  use m_rdmft_orbitals,   only : rdmft_orbs_t
  use m_specialmsg,       only : wrtout
+ use m_time,              only : abi_wtime
 
  implicit none
 
@@ -56,7 +57,12 @@ module m_rdmft_integrals
 !! SOURCE
 
  public :: orbs_to_real
+ public :: rdmft_tint
  public :: orb_to_real_one
+
+ !> Accumulated wall times (s) of the phases of rdmft_ints_compute on this process: 1 densities, 2 sum of the densities,
+ !> 3 J products and sum, 4 K pair sweep, 5 wait at the end of the K sweep (load imbalance), 6 sum of the K results
+ real(dp),save :: rdmft_tint(6) = 0.0_dp
 
  !> Request of the exchange part of the generalized Fock matrices, built in the loop of the K integrals
  type,public :: rdmft_fockreq_t
@@ -320,6 +326,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  !Local variables-------------------------------
  !scalars
  integer,parameter :: izero0=0
+ real(dp) :: tph
  integer :: jlo,jhi,cnt,comm_,ib,ierr,ik,iq,ip,jb,jk,jp,me,nb,nbj,nfft,nproc
  logical :: canon,fused,needk,red,wantf,isff,anybg
  integer :: ipb,iqb,pk
@@ -426,6 +433,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
 
  ABI_MALLOC(ui1,(2,nfft))
  cnt = 0
+ tph = abi_wtime()
 
  ! The density of the orbital (n,-k) is the one of (n,k): the representative k-points are transformed and the density is
  ! copied to the partner (background orbitals count twice)
@@ -455,12 +463,16 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    end do
  end do
  ABI_FREE(ui1)
+ rdmft_tint(1) = rdmft_tint(1)+abi_wtime()-tph
+ tph = abi_wtime()
  if (nproc > 1) then
    call xmpi_sum(rhog,comm_,ierr)
    call xmpi_sum(rbg,comm_,ierr)
    call xmpi_sum(ints%sjd,comm_,ierr)
  end if
 
+ rdmft_tint(2) = rdmft_tint(2)+abi_wtime()-tph
+ tph = abi_wtime()
  ! J_pq = Re sum_G conjg(rho_p) v rho_q / Omega, all the pairs with matrix products (blocks of columns shared among
  ! the processes)
  ABI_MALLOC(vrho,(2,nfft,max(ints%nfree,1)))
@@ -482,6 +494,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    ints%jint = half*(ints%jint+transpose(ints%jint))
  end if
  ABI_FREE(vrho)
+ rdmft_tint(3) = rdmft_tint(3)+abi_wtime()-tph
  ! Background-background pairs: |sum_q rho_q|^2 contains the diagonal terms
  ints%sjo = sum(vc(:)*(rbg(1,:)**2+rbg(2,:)**2))/orbs%ucvol-ints%sjd
  ABI_FREE(rhog)
@@ -504,6 +517,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  end if
  ABI_MALLOC(uj1,(2,nfft))
  cnt = 0
+ tph = abi_wtime()
  do ik=1,orbs%nkpt
    nb = orbs%nband(ik,1)
    if (.not.any(free(ints%offset(ik)+1:ints%offset(ik)+nb) .or. bg(ints%offset(ik)+1:ints%offset(ik)+nb))) cycle
@@ -601,6 +615,11 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    end do
    ABI_FREE(ui)
  end do
+ rdmft_tint(4) = rdmft_tint(4)+abi_wtime()-tph
+ tph = abi_wtime()
+ if (nproc > 1) call xmpi_barrier(comm_)
+ rdmft_tint(5) = rdmft_tint(5)+abi_wtime()-tph
+ tph = abi_wtime()
  if (nproc > 1) then
    call xmpi_sum(ints%kint,comm_,ierr)
    call xmpi_sum(ints%bk,comm_,ierr)
@@ -608,6 +627,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    call xmpi_sum(ints%skd,comm_,ierr)
    if (fused) call xmpi_sum(req%fx,comm_,ierr)
  end if
+ rdmft_tint(6) = rdmft_tint(6)+abi_wtime()-tph
  ABI_FREE(uj1)
  ABI_FREE(trk)
  if (fused) then

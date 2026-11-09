@@ -2303,7 +2303,7 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_lr',tread,'DPR')
  if(tread==1) dtset%rdmft_adam_lr=dprarr(1)
 
- call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_orb_etol',tread,'DPR')
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_orb_etol',tread,'ENE')
  if(tread==1) dtset%rdmft_orb_etol=dprarr(1)
 
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_orb_gtol',tread,'DPR')
@@ -2315,11 +2315,11 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_maxit',tread,'INT')
  if(tread==1) dtset%rdmft_adam_maxit=intarr(1)
 
- call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_beta1',tread,'DPR')
- if(tread==1) dtset%rdmft_adam_beta1=dprarr(1)
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_betam',tread,'DPR')
+ if(tread==1) dtset%rdmft_adam_betam=dprarr(1)
 
- call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_beta2',tread,'DPR')
- if(tread==1) dtset%rdmft_adam_beta2=dprarr(1)
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_betav',tread,'DPR')
+ if(tread==1) dtset%rdmft_adam_betav=dprarr(1)
 
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_rate',tread,'DPR')
  if(tread==1) dtset%rdmft_adam_rate=dprarr(1)

@@ -163,8 +163,8 @@ preserved: the rotation at $-\mathbf{k}$ is the conjugate matrix, so only one of
 parameters (and the rotations at time-reversal-invariant k-points are real). The parameters are the complex
 $\kappa_{pq}$ ($p<q$), and the gradient is the analytic one of the previous section.
 
-The ADAM optimizer is the complex version of the one of ReRDMFT: complex first moment (decay [[rdmft_adam_beta1]]), a real
-second moment of $|g|^2$ shared by the real and imaginary parts ([[rdmft_adam_beta2]]), bias corrections and the running
+The ADAM optimizer is the complex version of the one of ReRDMFT: complex first moment (decay [[rdmft_adam_betam]]), a real
+second moment of $|g|^2$ shared by the real and imaginary parts ([[rdmft_adam_betav]]), bias corrections and the running
 maximum of the second moment. A run has [[rdmft_adam_iter]] iterations (learning rate [[rdmft_adam_lr]]) and stops earlier
 if the largest gradient is below [[rdmft_orb_gtol]] or the energy changes by less than [[rdmft_orb_etol]]. If a run does not
 lower the energy, it restarts from the best point with the learning rate multiplied by [[rdmft_adam_rate]] and

@@ -45,7 +45,7 @@ module m_rdmft_driver
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_fock,        only : rdmft_fock_hartree_k
  use m_mpinfo,            only : destroy_mpi_enreg, initmpi_seq
- use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t
+ use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t, rdmft_tint
  use m_rdmft_optimizer,   only : rdmft_grad_jk, rdmft_optimize_jk, rdmft_optimize_pnof
  use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
  use m_specialmsg,        only : wrtout
@@ -125,7 +125,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  real(dp),allocatable :: eigc(:),eigf(:),ekin(:,:),h1c(:),h1diag(:,:),h1f(:),n0(:),nc(:),nfull(:),nf_gs(:),nopt(:)
  complex(dpc),allocatable :: hmat(:,:,:)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
- real(dp) :: tm(6),t0
+ real(dp) :: tm(8),t0,tint_max(6),tint_min(6),t_start
  integer :: nrel_last
 
 ! *************************************************************************
@@ -133,6 +133,8 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ABI_UNUSED(dtset%natom)
  alpha = dtset%rdmft_power
  tm = zero
+ rdmft_tint = zero
+ t_start = abi_wtime()
  is_jk = (dtset%rdmft_functional >= RDMFT_SD .and. dtset%rdmft_functional <= RDMFT_MULLER_AS)
  is_pnof = (dtset%rdmft_functional >= RDMFT_PNOF5 .and. dtset%rdmft_functional <= RDMFT_GNOF)
 
@@ -1156,7 +1158,7 @@ contains
    ABI_MALLOC(dx,(npar))
    ABI_MALLOC(h1c_b,(nbk))
    ABI_MALLOC(hmat_b,(size(hmat,1),size(hmat,2),size(hmat,3)))
-   call adam%init(npar,dtset%rdmft_adam_beta1,dtset%rdmft_adam_beta2)
+   call adam%init(npar,dtset%rdmft_adam_betam,dtset%rdmft_adam_betav)
    write(msg,'(2a,i0,a,es9.2,a,es9.2,a,es9.2,a)') ch10,' RDMFT: ADAM optimization of the orbitals (',npar,&
      ' complex rotation parameters); energy tolerance ',dtset%rdmft_orb_etol,', gradient tolerance ',dtset%rdmft_orb_gtol,&
      ', learning rate ',dtset%rdmft_adam_lr,ch10
@@ -1201,7 +1203,9 @@ contains
          gconv = .true.
          exit
        end if
+       t0 = abi_wtime()
        call adam%step(grad,lr,dx)
+       tm(6) = tm(6)+abi_wtime()-t0
        t0 = abi_wtime()
        call rotate_all(kpar,dx)
        tm(4) = tm(4)+abi_wtime()-t0
@@ -1248,8 +1252,10 @@ contains
      hmat = hmat_b
      gmax = gmax_b
      ! all the pairs of orbitals for the optimization of the occupations
+     t0 = abi_wtime()
      call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
                        dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,reduce=(dtset%rdmft_tr_reduce == 1))
+     tm(7) = tm(7)+abi_wtime()-t0
      call sync_h1f()
      ! Occupations for the new orbitals
      t0 = abi_wtime()
@@ -1287,6 +1293,21 @@ contains
    call wrtout([ab_out,std_out],msg)
    write(msg,'(a,5(a,f9.2))') ' RDMFT: timings (s):',' ints+Fock exchange =',tm(1),', energy =',tm(2),', Hartree Fock =',tm(3),&
      ', rotation =',tm(4),', occupations =',tm(5)
+   call wrtout([ab_out,std_out],msg)
+   ! Parallel efficiency report: wall times of the phases (max and min over the processes)
+   tm(8) = abi_wtime()-t_start
+   tint_max = rdmft_tint
+   tint_min = -rdmft_tint
+   call xmpi_max(tint_max,xmpi_world,ierr)
+   call xmpi_max(tint_min,xmpi_world,ierr)
+   tint_min = -tint_min
+   write(msg,'(a,i0,a)') ' RDMFT: parallel timings (s) on ',xmpi_comm_size(xmpi_world),' processes (max over processes)'
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(2(a,f10.2),a,f10.2)') '   ADAM step =',tm(6),'   full ints for occupations =',tm(7),'   total RDMFT =',tm(8)
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,6f10.2)') '   ints: dens, sumdens, J, Ksweep, Kwait, Ksum (max) =',tint_max
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,6f10.2)') '   ints: dens, sumdens, J, Ksweep, Kwait, Ksum (min) =',tint_min
    call wrtout([ab_out,std_out],msg)
    if (dtset%rdmft_occ_skip > zero) call spot_check(kpar)
    if (dtset%prtvol >= 10) call check_h()
