@@ -913,6 +913,7 @@ end subroutine rdmft_grad_jk
 !!  table <type(rdmft_pnof_table_t)> = pairs, subspaces, classes and variables
 !!  nk, nbk, h1, jint, kint, selfint = as rdmft_energy_pnof
 !!  bj(nbk), bk(nbk), bg = background orbitals (frozen occupied): sums of the integrals and constants
+!!  gam_start(ngam) = optional: starting angles (they take precedence over use_start/n0)
 !!  use_start, n0(nbk) = if use_start, the angles are those that give the occupations n0 (as closely as possible),
 !!    else all the angles start at pi/4
 !!  gtol = convergence threshold on the largest component of the gradient
@@ -923,10 +924,11 @@ end subroutine rdmft_grad_jk
 !!  nout(nbk) = optimized occupations of all the orbitals
 !!  energy = optimized electronic energy per unit cell
 !!  converged, niter
+!!  gam_out(ngam) = optional: final angles
 !!
 !! SOURCE
 subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,use_start,n0,gtol,maxit,check_grad,&
-                               nout,energy,converged,niter,verbose,e_shift)
+                               nout,energy,converged,niter,verbose,e_shift,gam_start,gam_out)
 
  !Arguments ------------------------------------
  !scalars
@@ -943,6 +945,8 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
  !arrays
  real(dp),intent(in) :: h1(nbk),jint(nbk,nbk),kint(nbk,nbk),bj(nbk),bk(nbk),n0(nbk)
  real(dp),intent(out) :: nout(nbk)
+ real(dp),optional,intent(in) :: gam_start(:)
+ real(dp),optional,intent(out) :: gam_out(:)
 
  !Local variables-------------------------------
  !scalars
@@ -981,6 +985,9 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
 
  gam = pi4
  if (use_start) call rdmft_pnof_gamma(table,nbk,n0,gam)
+ if (present(gam_start)) then
+   if (size(gam_start) == ngam) gam = gam_start
+ end if
  call eval(gam,f0,g)
 
  if (check_grad) then
@@ -1082,6 +1089,7 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
 
  call occupations(gam,nout)
  energy = rdmft_energy_pnof(func,table,nk,nbk,nout,h1,jint,kint,selfint,bj,bk,bg)
+ if (present(gam_out)) gam_out(1:ngam) = gam
 
  ABI_FREE(gam)
  ABI_FREE(g)

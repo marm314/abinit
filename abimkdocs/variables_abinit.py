@@ -20210,16 +20210,47 @@ Variable(
     topics=["RDMFT_useful"],
     dimensions="scalar",
     defaultval=0,
-    mnemonics="Reduced Density Matrix Functional Theory: RESTART from occupation numbers",
+    mnemonics="Reduced Density Matrix Functional Theory: RESTART from the result of a previous RDMFT run",
     characteristics=["[[DEVELOP]]"],
     added_in_version="10.9.3",
     text=r"""
-If 1, the optimization of the occupation numbers of an RDMFT calculation ([[optdriver]] = 11) starts from the occupations
-read in the file RDMFT_OCC.in of the working directory, instead of the default guess ([[rdmft_start]]). Every RDMFT
-optimization writes at the end the file *_RDMFT_OCC (the root of the output file names), whose format is the one of RDMFT_OCC.in:
-a first line with the number of k-points and of bands, then one line "ik ib n" per orbital with the occupation
-per spin (between 0 and 1). The orbitals that are not in the file keep the occupations of the ground-state calculation.
-For the PNOF functionals the angles of the subspaces are chosen to reproduce the occupations as closely as possible.
+If 1, an RDMFT calculation ([[optdriver]] = 11) restarts from the result of a previous RDMFT calculation instead of starting
+from the ground-state orbitals and the default occupations ([[rdmft_start]]).
+Every RDMFT optimization writes at its end the file *_RDMFT_RESTART (the root of the output file names), and, with
+[[prtwf]] = 1, the file *_WFK with the optimized (natural) orbitals. A restart needs both: the WFK file is read with
+[[getwfk]] or [[getwfk_filepath]], as the ground-state orbitals are, and the restart file is given by
+[[rdmft_restart_filepath]]. The restart file contains the occupation numbers, the classification of the orbitals
+(occupied, active), for the PNOF functionals the table of subspaces (principal and virtual orbitals of each subspace)
+and the angles, and the learning rate of ADAM. The table and the active space are NOT rebuilt from the orbital energies
+and occupations, which are no longer those of a ground state: they are those of the run that wrote the file.
+The restart is refused if the file does not correspond to the calculation: functional of a different type (JK-only or PNOF),
+number of k-points or bands, number of electrons, [[rdmft_nocc_act]], [[rdmft_nvir_act]], [[rdmft_ecut_act]] or [[rdmft_ncoupl]].
+The energies printed as "ground-state" ones (and the density change) refer then to the state of the restart.
+
+If [[rdmft_restart_filepath]] is not given, the file is looked for with the name deduced from the one of the WFK file
+(`xxx_WFK` -> `xxx_RDMFT_RESTART`), and, if it does not exist, the old text file RDMFT_OCC.in of the working directory is used:
+a first line with the number of k-points and of bands, then one line "ik ib n" per orbital with the occupation per spin
+(between 0 and 1), as written in the file *_RDMFT_OCC; in this case only the occupations are restarted (for the PNOF
+functionals the angles are chosen to reproduce the occupations as closely as possible, with the table of subspaces
+built from the ground-state orbitals).
+""",
+),
+
+Variable(
+    abivarname="rdmft_restart_filepath",
+    varset="dev",
+    vartype="string",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=None,
+    mnemonics="Reduced Density Matrix Functional Theory: path of the RESTART FILE",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Path of the restart file (*_RDMFT_RESTART) written by a previous RDMFT calculation, used when [[rdmft_restart]] = 1.
+The string must be enclosed between quotation marks:
+
+    rdmft_restart_filepath "../outdata/out_RDMFT_RESTART"
 """,
 ),
 

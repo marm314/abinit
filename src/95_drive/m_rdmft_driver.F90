@@ -130,6 +130,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
  real(dp) :: tm(8),t0,tint_max(6),tint_min(6),t_start,tst(7)
  integer :: nrel_last,nmem_eval
+ logical :: restart_full,rst_conv
+ real(dp) :: rst_lr0,rst_lr1
+ character(len=fnlen) :: rst_path
+ real(dp),allocatable :: gam_rst(:),gam_last(:)
 
 ! *************************************************************************
 
@@ -255,6 +259,11 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ! Orbitals with a composite index (band, k-point), active space and free/background sets
  ! ------------------------------------------------------------------
  nbk = sum(orbs%nband(:,1))
+ rst_lr0 = dtset%rdmft_adam_lr
+ rst_lr1 = rst_lr0
+ rst_conv = .false.
+ restart_full = .false.
+ if (dtset%rdmft_restart == 1) call find_restart_file()
  ABI_MALLOC(offset,(orbs%nkpt))
  ABI_MALLOC(nc,(nbk))
  ABI_MALLOC(h1c,(nbk))
@@ -284,13 +293,21 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    end do
  end do
 
- ! Active space (rdmft_nocc_act, rdmft_nvir_act, rdmft_ecut_act)
- call rdmft_active_space(nbk,eigc,bandc,noccb,occd,dtset%rdmft_nocc_act,dtset%rdmft_nvir_act,dtset%rdmft_ecut_act,actc)
-
- ! PNOF subspaces (rdmft_ncoupl), needed to optimize a PNOF and to evaluate them with the ground-state occupations
+ ! Restart file: occupations, classification of the orbitals (occupied, active) and PNOF table of the previous run
  need_table = (is_pnof .or. dtset%rdmft_functional == 0)
  ierr_t = 1
- if (need_table) call table%build(nbk,eigc,occd,actc,partner,dtset%rdmft_ncoupl,ierr_t)
+ if (restart_full) call read_restart_file(rst_path,ierr_t)
+
+ ! Active space (rdmft_nocc_act, rdmft_nvir_act, rdmft_ecut_act)
+ if (.not.restart_full) then
+   call rdmft_active_space(nbk,eigc,bandc,noccb,occd,dtset%rdmft_nocc_act,dtset%rdmft_nvir_act,dtset%rdmft_ecut_act,actc)
+ end if
+
+ ! PNOF subspaces (rdmft_ncoupl), needed to optimize a PNOF and to evaluate them with the ground-state occupations
+ if (.not.restart_full) then
+   ierr_t = 1
+   if (need_table) call table%build(nbk,eigc,occd,actc,partner,dtset%rdmft_ncoupl,ierr_t)
+ end if
  table_ok = (need_table .and. ierr_t == 0)
  if (is_pnof .and. .not.table_ok) then
    ABI_ERROR('RDMFT: no active occupied orbital or not enough virtual orbitals for rdmft_ncoupl (PNOF optimization).')
@@ -366,6 +383,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  bgt%sh = sum(h1c,mask=bg)
  bgt%sjo = ints%sjo; bgt%sko = ints%sko; bgt%sjd = ints%sjd; bgt%skd = ints%skd
  if (table_ok) call rdmft_pnof_table_remap(table,nbk,ints%free_of,nf)
+ if (table_ok) then
+   ABI_MALLOC(gam_last,(table%ngam))
+   gam_last = zero
+ end if
 
  ! ------------------------------------------------------------------
  ! Energy with the occupations of the ground-state calculation
@@ -463,7 +484,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
        n0 = nf_gs
      end if
    end if
-   if (dtset%rdmft_restart == 1) call read_occ_file(nf,ints%comp_of,offset,orbs%nband(:,1),n0)
+   if (dtset%rdmft_restart == 1 .and. .not.restart_full) call read_occ_file(nf,ints%comp_of,offset,orbs%nband(:,1),n0)
 
    call optimize_occupations(n0,eopt,conv,niter,.true.)
    tst(5) = abi_wtime()-t_start
@@ -496,7 +517,11 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    write(msg,'(a,7f9.2)') ' RDMFT: elapsed (s) after read WFK / completion+TR / orbital setup / integrals / first occupations'//&
      ' / orbital macro / output =',tst
    call wrtout([ab_out,std_out],msg)
-   if (xmpi_comm_rank(xmpi_world) == master) call write_occ_file(trim(dtfil%filnam_ds(4))//'_RDMFT_OCC')
+   rst_conv = conv
+ if (xmpi_comm_rank(xmpi_world) == master) then
+   call write_occ_file(trim(dtfil%filnam_ds(4))//'_RDMFT_OCC')
+   call write_restart_file(trim(dtfil%filnam_ds(4))//'_RDMFT_RESTART',eopt+e_ewald+e_corepsp)
+ end if
    if (dtset%rdmft_check_rot > 0) call check_rotations(eopt+e_ewald+e_corepsp)
    ABI_FREE(nfull)
    ABI_FREE(rho_ref)
@@ -504,6 +529,8 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ABI_FREE(nopt)
  end if
 
+ ABI_SFREE(gam_rst)
+ ABI_SFREE(gam_last)
  ABI_FREE(offset)
  ABI_FREE(nc)
  ABI_FREE(h1c)
@@ -563,6 +590,7 @@ contains
    integer,intent(out) :: nit_out
    logical,intent(in) :: talkative
    logical :: done
+   real(dp),allocatable :: gtmp(:)
    if (is_jk .and. dtset%rdmft_occ_skip > zero) then
      call optimize_occ_guarded(nstart,e_out,conv_out,nit_out,talkative,done)
      if (done) return
@@ -572,9 +600,26 @@ contains
                             dtset%rdmft_occ_min,&
                             ints%bj,ints%bk,bgt,nopt,e_out,conv_out,nit_out,verbose=talkative,e_shift=e_ewald+e_corepsp)
    else
-     call rdmft_optimize_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,h1f,ints%jint,ints%kint,dtset%rdmft_selfint,&
-                              ints%bj,ints%bk,bgt,dtset%rdmft_restart == 1,nstart,1.0e-8_dp,500,dtset%prtvol >= 10,&
-                              nopt,e_out,conv_out,nit_out,verbose=talkative,e_shift=e_ewald+e_corepsp)
+     if (restart_full) then
+       ! restart: the angles of the previous run (first optimization) or of the previous optimization
+       ABI_MALLOC(gtmp,(table%ngam))
+       if (allocated(gam_rst)) then
+         gtmp = gam_rst
+         ABI_FREE(gam_rst)
+       else
+         gtmp = gam_last
+       end if
+       call rdmft_optimize_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,h1f,ints%jint,ints%kint,dtset%rdmft_selfint,&
+                                ints%bj,ints%bk,bgt,.true.,nstart,1.0e-8_dp,500,dtset%prtvol >= 10,&
+                                nopt,e_out,conv_out,nit_out,verbose=talkative,e_shift=e_ewald+e_corepsp,&
+                                gam_start=gtmp,gam_out=gam_last)
+       ABI_FREE(gtmp)
+     else
+       call rdmft_optimize_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,h1f,ints%jint,ints%kint,dtset%rdmft_selfint,&
+                                ints%bj,ints%bk,bgt,dtset%rdmft_restart == 1,nstart,1.0e-8_dp,500,&
+                                dtset%prtvol >= 10,nopt,e_out,conv_out,nit_out,verbose=talkative,e_shift=e_ewald+e_corepsp,&
+                                gam_out=gam_last)
+     end if
    end if
  end subroutine optimize_occupations
 
@@ -1247,7 +1292,7 @@ contains
    write(msg,'(2a)') ' Orbital optimization, macro-iterations (ADAM rotations of the orbitals, then occupation numbers):',ch10//&
      '  MACRO  macro        Etotal(Ha)      deltaE(Ha)    max|g|  ADAM-its  occ-its  status'
    call wrtout([ab_out,std_out],msg)
-   lr = dtset%rdmft_adam_lr
+   lr = rst_lr0
    extra = 0
    e_old = e_start
    nstall = 0
@@ -1370,6 +1415,7 @@ contains
      end if
      e_old = e_new
    end do
+   rst_lr1 = lr
    write(msg,'(a,i0,a)') ' RDMFT: orbital optimization finished after ',mi,' macro-iterations'
    call wrtout([ab_out,std_out],msg)
    write(msg,'(a,t52,a,es22.14,a)') ' RDMFT: total energy after the orbital optimization',' = ',e_old,ch10
@@ -1774,6 +1820,172 @@ contains
    ABI_FREE(f0)
    ABI_FREE(fp)
  end subroutine check_rotations
+
+ subroutine find_restart_file()
+   ! File of the restart (rdmft_restart = 1): rdmft_restart_filepath, else the name deduced from the one of the WFK file
+   ! (xxx_WFK -> xxx_RDMFT_RESTART); if it does not exist the old file RDMFT_OCC.in (occupations only) is used
+   integer :: ii
+   logical :: ex
+   rst_path = dtset%rdmft_restart_filepath
+   if (rst_path /= ABI_NOFILE) then
+     inquire(file=trim(rst_path),exist=ex)
+     if (.not.ex) then
+       ABI_ERROR(sjoin('RDMFT: rdmft_restart_filepath: the restart file does not exist:',trim(rst_path)))
+     end if
+     restart_full = .true.
+   else
+     ii = index(wfk_path,'_WFK',back=.true.)
+     if (ii > 1) then
+       rst_path = wfk_path(1:ii-1)//'_RDMFT_RESTART'
+       inquire(file=trim(rst_path),exist=ex)
+       restart_full = ex
+     end if
+   end if
+   if (restart_full) then
+     write(msg,'(3a)') ch10,' RDMFT: restart from the file ',trim(rst_path)
+   else
+     write(msg,'(2a)') ch10,' RDMFT: no *_RDMFT_RESTART file found: only the occupations of RDMFT_OCC.in are used (old restart).'
+   end if
+   call wrtout([ab_out,std_out],msg)
+ end subroutine find_restart_file
+
+ subroutine write_restart_file(fname,etot_final)
+   ! Binary restart file (stream): magic, metadata, occupations, classification of the orbitals, PNOF table (composite
+   ! orbital indices) and angles, learning rate of ADAM. The orbitals are in the WFK file (prtwf = 1).
+   character(len=*),intent(in) :: fname
+   real(dp),intent(in) :: etot_final
+   integer :: unt,ios,jf,ig
+   integer,allocatable :: gorb(:),ovar(:)
+   real(dp),allocatable :: gam_w(:)
+   open(newunit=unt,file=fname,access='stream',form='unformatted',status='replace',action='write',iostat=ios)
+   if (ios /= 0) then
+     ABI_ERROR(sjoin('RDMFT: cannot open the restart file for writing:',fname))
+   end if
+   write(unt) 'RDMFTRS1'
+   write(unt) orbs%nkpt,nbk,dtset%rdmft_functional,dtset%rdmft_ncoupl,dtset%rdmft_nocc_act,dtset%rdmft_nvir_act,&
+              dtset%rdmft_selfint,merge(1,0,table_ok),merge(1,0,rst_conv)
+   write(unt) orbs%nelect,dtset%rdmft_ecut_act,etot_final,dtset%rdmft_adam_lr,rst_lr1,dtset%rdmft_power
+   write(unt) orbs%nband(:,1)
+   write(unt) merge(1,0,occd),merge(1,0,actc)
+   write(unt) nfull
+   if (table_ok) then
+     ABI_MALLOC(gorb,(table%ng))
+     ABI_MALLOC(ovar,(nbk))
+     do ig=1,table%ng
+       gorb(ig) = ints%comp_of(table%gem_orb(ig))
+     end do
+     ovar = 0
+     do jf=1,nf
+       ovar(ints%comp_of(jf)) = table%orb_var(jf)
+     end do
+     ABI_MALLOC(gam_w,(table%ngam))
+     if (is_pnof) then
+       gam_w = gam_last
+     else
+       gam_w = zero
+     end if
+     write(unt) table%ng,table%nsub,table%nclass,table%nvar,table%ngam
+     write(unt) gorb,table%gem_sub(1:table%ng),merge(1,0,table%gem_principal(1:table%ng))
+     write(unt) table%class_var,table%class_nvirt,table%var_mult(1:table%nvar),ovar
+     write(unt) gam_w
+     ABI_FREE(gorb)
+     ABI_FREE(ovar)
+     ABI_FREE(gam_w)
+   end if
+   close(unt)
+   write(msg,'(3a)') ' RDMFT: restart file written in ',trim(fname),' (to be used with the WFK file and rdmft_restart = 1)'
+   call wrtout([ab_out,std_out],msg)
+ end subroutine write_restart_file
+
+ subroutine read_restart_file(fname,ierr_tab)
+   ! Read the restart file: sets nc (occupations), occd, actc, the table (composite indices) and the angles of the first
+   ! optimization; the file must correspond to the calculation
+   character(len=*),intent(in) :: fname
+   integer,intent(out) :: ierr_tab
+   character(len=8) :: magic
+   integer :: unt,ios,nk_f,nbk_f,func_f,ncoupl_f,nocc_f,nvir_f,selfint_f,hastab,conv_f
+   integer :: ng,nsub,ncl,nvar,ngam
+   real(dp) :: nelect_f,ecut_f,e_f,lr0_f,lr1_f,pow_f
+   integer,allocatable :: nband_f(:),occ_i(:),act_i(:),prin_i(:)
+   real(dp),allocatable :: nf_f(:)
+   ierr_tab = 1
+   open(newunit=unt,file=fname,access='stream',form='unformatted',status='old',action='read',iostat=ios)
+   if (ios /= 0) then
+     ABI_ERROR(sjoin('RDMFT: cannot open the restart file:',fname))
+   end if
+   read(unt,iostat=ios) magic
+   if (ios /= 0 .or. magic /= 'RDMFTRS1') then
+     ABI_ERROR(sjoin('RDMFT: not a restart file of this version of the RDMFT driver:',fname))
+   end if
+   read(unt) nk_f,nbk_f,func_f,ncoupl_f,nocc_f,nvir_f,selfint_f,hastab,conv_f
+   read(unt) nelect_f,ecut_f,e_f,lr0_f,lr1_f,pow_f
+   if (nk_f /= orbs%nkpt .or. nbk_f /= nbk) then
+     write(msg,'(a,2(a,i0,a,i0),a)') 'RDMFT: the restart file does not correspond to the orbitals (k-points, orbitals): ',&
+       ' file ',nk_f,' and ',nbk_f,'; calculation ',orbs%nkpt,' and ',nbk,&
+       '. The WFK file and the restart file must come from the same run.'
+     ABI_ERROR(msg)
+   end if
+   ABI_MALLOC(nband_f,(nk_f))
+   read(unt) nband_f
+   if (any(nband_f /= orbs%nband(:,1))) then
+     ABI_ERROR('RDMFT: the numbers of bands per k-point of the restart file and of the WFK file differ.')
+   end if
+   if (abs(nelect_f-orbs%nelect) > 1.0e-8_dp) then
+     ABI_ERROR('RDMFT: the number of electrons of the restart file differs from the one of the calculation.')
+   end if
+   if (nocc_f /= dtset%rdmft_nocc_act .or. nvir_f /= dtset%rdmft_nvir_act .or. abs(ecut_f-dtset%rdmft_ecut_act) > 1.0e-10_dp) then
+     write(msg,'(2a,2i5,es10.2,a,2i5,es10.2)') 'RDMFT: the active window (rdmft_nocc_act, rdmft_nvir_act, rdmft_ecut_act) ',&
+       'of the restart file differs from the input: file',nocc_f,nvir_f,ecut_f,', input',dtset%rdmft_nocc_act,&
+       dtset%rdmft_nvir_act,dtset%rdmft_ecut_act
+     ABI_ERROR(msg)
+   end if
+   if (need_table .and. hastab == 1 .and. ncoupl_f /= dtset%rdmft_ncoupl) then
+     write(msg,'(a,i0,a,i0,a)') 'RDMFT: rdmft_ncoupl of the restart file (',ncoupl_f,') differs from the input (',&
+       dtset%rdmft_ncoupl,').'
+     ABI_ERROR(msg)
+   end if
+   if (is_pnof .and. hastab == 0) then
+     ABI_ERROR('RDMFT: the restart file was written by a JK-only functional and has no PNOF subspaces.')
+   end if
+   ABI_MALLOC(occ_i,(nbk))
+   ABI_MALLOC(act_i,(nbk))
+   ABI_MALLOC(nf_f,(nbk))
+   read(unt) occ_i,act_i
+   read(unt) nf_f
+   occd = (occ_i /= 0)
+   actc = (act_i /= 0)
+   nc = nf_f
+   if (hastab == 1) then
+     read(unt) ng,nsub,ncl,nvar,ngam
+     call table%free()
+     table%ng = ng; table%nsub = nsub; table%nclass = ncl; table%nvar = nvar; table%ngam = ngam
+     ABI_MALLOC(table%gem_orb,(ng))
+     ABI_MALLOC(table%gem_sub,(ng))
+     ABI_MALLOC(table%gem_principal,(ng))
+     ABI_MALLOC(prin_i,(ng))
+     ABI_MALLOC(table%class_var,(ncl))
+     ABI_MALLOC(table%class_nvirt,(ncl))
+     ABI_MALLOC(table%var_mult,(nvar))
+     ABI_MALLOC(table%orb_var,(nbk))
+     read(unt) table%gem_orb,table%gem_sub,prin_i
+     table%gem_principal = (prin_i /= 0)
+     read(unt) table%class_var,table%class_nvirt,table%var_mult,table%orb_var
+     ABI_MALLOC(gam_rst,(ngam))
+     read(unt) gam_rst
+     ABI_FREE(prin_i)
+     if (need_table) ierr_tab = 0
+   end if
+   close(unt)
+   rst_lr0 = dtset%rdmft_adam_lr
+   if (abs(lr0_f-dtset%rdmft_adam_lr) <= 1.0e-12_dp*dtset%rdmft_adam_lr) rst_lr0 = max(lr1_f,1.0e-3_dp*lr0_f)
+   write(msg,'(a,i0,a,i0,a,es22.14,a,l1,a,es9.2,a)') ' RDMFT: restart file: functional ',func_f,', PNOF table ',hastab,&
+     ', energy of the previous run ',e_f,' Ha, converged = ',conv_f == 1,'; ADAM learning rate ',rst_lr0,ch10
+   call wrtout([ab_out,std_out],msg)
+   ABI_FREE(nband_f)
+   ABI_FREE(occ_i)
+   ABI_FREE(act_i)
+   ABI_FREE(nf_f)
+ end subroutine read_restart_file
 
  subroutine write_occ_file(fname)
    ! File of the occupation numbers per spin of all the orbitals: first line nkpt and nband, then "ik ib n"

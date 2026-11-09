@@ -2291,6 +2291,9 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_power',tread,'DPR')
  if(tread==1) dtset%rdmft_power=dprarr(1)
 
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_restart_filepath',tread,'KEY', key_value=key_value)
+ if(tread==1) dtset%rdmft_restart_filepath = key_value
+
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_restart',tread,'INT')
  if(tread==1) dtset%rdmft_restart=intarr(1)
 

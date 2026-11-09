@@ -104,7 +104,7 @@ energy that needs all their pairs; it is computed if [[rdmft_core_ints]] = 1 (de
    with the same cell, k-points, [[ecut]] and pseudopotentials, and the input variables of the RDMFT:
    [[rdmft_functional]], the active space and [[rdmft_ncoupl]], [[rdmft_selfint]]...
 3. The optimized occupation numbers are printed for the first k-point and written in the file
-   `*_RDMFT_OCC`. Copying it to `RDMFT_OCC.in` and setting [[rdmft_restart]] = 1 restarts a calculation from them
+   `*_RDMFT_OCC`. The file `*_RDMFT_RESTART` is also written, for restarting (see below)
    ([[rdmft_start]] = 1 starts the JK-only functionals from Fermi-Dirac occupations instead).
 
 An example (N$_2$ molecule in a cubic cell of 4 angstrom with 8 k-points; the Hartree-Fock orbitals, then the Muller
@@ -202,6 +202,28 @@ numbers 2 n (between 0 and 2, as in the natural-orbital files of the GW 1-RDM) a
 the one-electron Hamiltonian (kinetic, local and non-local pseudopotential; the natural orbitals are not eigenstates of any
 one-body operator). The files are named like those of the ground-state calculations (`<output>_WFK`, `<output>_DEN`) and can
 be used for visualization or as the starting point of another calculation.
+
+## Restarting a calculation
+
+A calculation can be continued (more ADAM iterations, a different functional, a chain of runs) from the result of a
+previous RDMFT run. The run that ends writes, with [[prtwf]] = 1, the WFK file of the optimized orbitals, and always the
+file `*_RDMFT_RESTART`. The next run reads the orbitals as it reads the ground-state ones ([[getwfk]] or
+[[getwfk_filepath]]) and sets [[rdmft_restart]] = 1; the restart file is [[rdmft_restart_filepath]], or, by default, the one
+that goes with the WFK file (`xxx_WFK` -> `xxx_RDMFT_RESTART`):
+
+    getwfk_filepath "run1o_WFK"
+    rdmft_restart 1
+
+The restart file contains what cannot be deduced from the orbitals: the occupation numbers, the classification of the
+orbitals (occupied, active), for the PNOF functionals the table of subspaces (principal and virtual orbitals of each
+subspace) and the optimized angles, and the learning rate of ADAM. The table and the active space are not rebuilt from the
+orbital energies and occupations, since the WFK file of an RDMFT run does not contain ground-state energies. The restart
+is refused (with an explanation) if the file does not correspond to the calculation: number of k-points, bands or
+electrons, [[rdmft_nocc_act]], [[rdmft_nvir_act]], [[rdmft_ecut_act]], [[rdmft_ncoupl]] (PNOF), or a restart file of a
+JK-only functional for a PNOF run. A JK-only functional can restart from a PNOF file and vice versa is not possible. The
+"ground-state" energies and the density change printed at the beginning refer to the restart state: with fixed
+orbitals ([[rdmft_orb_macro]] = 0) the energy of the restart state is reproduced exactly and the occupations are
+converged in one iteration. Without a restart file, `RDMFT_OCC.in` is used as before (occupations only).
 
 ## Degenerate states and the choice of the orbitals
 

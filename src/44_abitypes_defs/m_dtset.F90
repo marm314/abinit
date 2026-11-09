@@ -1212,6 +1212,7 @@ type, public :: dataset_type
  character(len=fnlen) :: getdvdb_filepath = ABI_NOFILE
  character(len=fnlen) :: getdrhodb_filepath = ABI_NOFILE
  character(len=fnlen) :: getwfk_filepath = ABI_NOFILE
+ character(len=fnlen) :: rdmft_restart_filepath = ABI_NOFILE
  character(len=fnlen) :: getwfkfine_filepath = ABI_NOFILE
  character(len=fnlen) :: getwfmq_filepath = ABI_NOFILE
  character(len=fnlen) :: getwfq_filepath = ABI_NOFILE
@@ -1901,6 +1902,7 @@ type(dataset_type) function dtset_copy(dtin) result(dtout)
  dtout%getscr_filepath    = dtin%getscr_filepath
  dtout%getvpq_filepath    = dtin%getvpq_filepath
  dtout%getwfk_filepath    = dtin%getwfk_filepath
+ dtout%rdmft_restart_filepath = dtin%rdmft_restart_filepath
  dtout%getwfkfine_filepath= dtin%getwfkfine_filepath
  dtout%getwfmq_filepath        = dtin%getwfmq_filepath
  dtout%getwfq_filepath    = dtin%getwfq_filepath
@@ -4069,7 +4071,7 @@ subroutine chkvars(string)
  list_vars=trim(list_vars)//' recefermi recgratio recnpath recnrec recptrott recrcut rectesteg rectolden'
 !list_vars=trim(list_vars)//' red_dfield red_efield red_efieldbar restartxf rfasr'
  list_vars=trim(list_vars)//' rdmft_check_rot rdmft_core_ints rdmft_ecut_act rdmft_functional rdmft_ncoupl rdmft_nocc_act rdmft_nvir_act'
- list_vars=trim(list_vars)//' rdmft_power rdmft_restart rdmft_rot_k rdmft_rot_p rdmft_rot_q rdmft_rot_step'
+ list_vars=trim(list_vars)//' rdmft_power rdmft_restart rdmft_restart_filepath rdmft_rot_k rdmft_rot_p rdmft_rot_q rdmft_rot_step'
  list_vars=trim(list_vars)//' rdmft_selfint rdmft_start'
  list_vars=trim(list_vars)//' rdmft_tr_reduce rdmft_occ_min rdmft_occ_skip rdmft_complete rdmft_adam_betam rdmft_adam_betav rdmft_adam_incr rdmft_adam_maxit rdmft_adam_rate rdmft_adam_iter rdmft_adam_lr rdmft_orb_etol rdmft_orb_gtol rdmft_orb_macro'
  list_vars=trim(list_vars)//' red_dfield red_efield red_efieldbar restartxf'
