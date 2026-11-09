@@ -43,10 +43,12 @@ module m_rdmft_driver
                                  rdmft_coef_jk, rdmft_coef_pnof, rdmft_energy_jk, rdmft_energy_pnof, rdmft_fermi_dirac, &
                                  rdmft_functional_name, rdmft_pnof_table_remap, rdmft_pnof_table_t
  use m_rdmft_hamiltonian, only : rdmft_one_electron
- use m_rdmft_integrals,   only : rdmft_ints_t
+ use m_rdmft_fock,        only : rdmft_fock_hartree_k
+ use m_rdmft_integrals,   only : rdmft_fockreq_t, rdmft_ints_t
  use m_rdmft_optimizer,   only : rdmft_optimize_jk, rdmft_optimize_pnof
  use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
  use m_specialmsg,        only : wrtout
+ use m_time,              only : abi_wtime
 
  implicit none
 
@@ -120,11 +122,13 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  real(dp),allocatable :: eigc(:),eigf(:),ekin(:,:),h1c(:),h1diag(:,:),h1f(:),n0(:),nc(:),nfull(:),nf_gs(:),nopt(:)
  complex(dpc),allocatable :: hmat(:,:,:)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
+ real(dp) :: tm(6),t0
 
 ! *************************************************************************
 
  ABI_UNUSED(dtset%natom)
  alpha = dtset%rdmft_power
+ tm = zero
  is_jk = (dtset%rdmft_functional >= RDMFT_SD .and. dtset%rdmft_functional <= RDMFT_MULLER_AS)
  is_pnof = (dtset%rdmft_functional >= RDMFT_PNOF5 .and. dtset%rdmft_functional <= RDMFT_GNOF)
 
@@ -449,18 +453,6 @@ contains
    end do
  end subroutine assemble_nfull
 
- subroutine refresh_ints()
-   ! Integrals and one-electron elements of the current (rotated) orbitals
-   integer :: jf
-   call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
-                     dtset%rdmft_core_ints == 1,quiet=.true.)
-   do jf=1,nf
-     h1f(jf) = h1c(ints%comp_of(jf))
-   end do
-   bgt%sh = sum(h1c,mask=bg)
-   bgt%sjo = ints%sjo; bgt%sko = ints%sko; bgt%sjd = ints%sjd; bgt%skd = ints%skd
- end subroutine refresh_ints
-
  subroutine apply_u(jk,umat)
    ! Rotate the bands of the k-point jk with U, and the core Hamiltonian matrix: h' = U^dagger h U
    integer,intent(in) :: jk
@@ -505,22 +497,93 @@ contains
    end do
  end subroutine rotate_all
 
- subroutine orbital_gradient(kpar,grad,gmax)
-   ! Complex orbital gradient (dE/dRe kappa_pq + i dE/dIm kappa_pq, p<q) of the independent k-points; the time-reversed
-   ! k-point gives the same contribution, and the rotations at the time-reversal-invariant k-points are real
+ function energy_cur() result(e)
+   ! Total energy at the occupations nfull for the current integrals, one-electron elements and background sums
+   real(dp) :: e
+   integer :: jf
+   real(dp),allocatable :: nx(:)
+   ABI_MALLOC(nx,(nf))
+   do jf=1,nf
+     nx(jf) = nfull(ints%comp_of(jf))
+   end do
+   if (is_jk) then
+     e = rdmft_energy_jk(dtset%rdmft_functional,orbs%nkpt,nf,nx,h1f,ints%jint,ints%kint,alpha,ints%bj,ints%bk,bgt)&
+         +e_ewald+e_corepsp
+   else
+     e = rdmft_energy_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,nx,h1f,ints%jint,ints%kint,dtset%rdmft_selfint,&
+                           ints%bj,ints%bk,bgt)+e_ewald+e_corepsp
+   end if
+   ABI_FREE(nx)
+ end function energy_cur
+
+ subroutine sync_h1f()
+   ! One-electron elements and background sums from h1c and the integrals
+   integer :: jf
+   do jf=1,nf
+     h1f(jf) = h1c(ints%comp_of(jf))
+   end do
+   bgt%sh = sum(h1c,mask=bg)
+   bgt%sjo = ints%sjo; bgt%sko = ints%sko; bgt%sjd = ints%sjd; bgt%skd = ints%skd
+ end subroutine sync_h1f
+
+ subroutine eval_point(kpar,e_out,grad,gmax)
+   ! Energy and complex orbital gradient (dE/dRe kappa_pq + i dE/dIm kappa_pq, p<q) of the current orbitals at the occupations
+   ! nfull, from ONE sweep over the pair densities: the exchange integrals and the exchange part of the generalized Fock
+   ! matrices are built in the same loop. The time-reversed k-point gives the same contribution as k, and the rotations at
+   ! the time-reversal-invariant k-points are real.
    integer,intent(in) :: kpar(:)
+   real(dp),intent(out) :: e_out,gmax
    complex(dpc),intent(out) :: grad(:)
-   real(dp),intent(out) :: gmax
-   integer :: jk,ipar,pp,qq,nb2
+   integer :: jk,ipar,pp,qq,nb2,nbmax
    real(dp) :: fac
    complex(dpc) :: dg
-   complex(dpc),allocatable :: fk(:,:)
+   complex(dpc),allocatable :: fk(:,:),fh(:,:)
+   real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:)
+   type(rdmft_fockreq_t) :: req
+   nbmax = maxval(orbs%nband(:,1))
+   ABI_MALLOC(req%want,(orbs%nkpt))
+   ABI_MALLOC(req%ccoef,(nbmax,nbk,orbs%nkpt))
+   ABI_MALLOC(req%fx,(nbmax,nbmax,orbs%nkpt))
+   req%ccoef = zero
+   req%want = (kpar >= 0)
+   do jk=1,orbs%nkpt
+     if (kpar(jk) < 0) cycle
+     nb2 = orbs%nband(jk,1)
+     ABI_MALLOC(acf,(nb2,nbk))
+     ABI_MALLOC(ccf,(nb2,nbk))
+     ABI_MALLOC(nux,(nb2))
+     call build_coefs(jk,acf,ccf,nux)
+     req%ccoef(1:nb2,:,jk) = ccf
+     ABI_FREE(acf)
+     ABI_FREE(ccf)
+     ABI_FREE(nux)
+   end do
+   t0 = abi_wtime()
+   call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
+                     dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,req=req)
+   tm(1) = tm(1)+abi_wtime()-t0
+   t0 = abi_wtime()
+   call sync_h1f()
+   e_out = energy_cur()
+   tm(2) = tm(2)+abi_wtime()-t0
    grad = czero
    do jk=1,orbs%nkpt
      if (kpar(jk) < 0) cycle
      nb2 = orbs%nband(jk,1)
+     ABI_MALLOC(acf,(nb2,nbk))
+     ABI_MALLOC(ccf,(nb2,nbk))
+     ABI_MALLOC(nux,(nb2))
      ABI_MALLOC(fk,(nb2,nb2))
-     call build_fock(jk,fk)
+     ABI_MALLOC(fh,(nb2,nb2))
+     call build_coefs(jk,acf,ccf,nux)
+     t0 = abi_wtime()
+     call rdmft_fock_hartree_k(orbs,jk,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,offset,nbk,acf,xmpi_world,fh)
+     tm(3) = tm(3)+abi_wtime()-t0
+     do qq=1,nb2
+       do pp=1,nb2
+         fk(pp,qq) = fh(pp,qq)+req%fx(pp,qq,jk)+nux(qq)*hmat(qq,pp,jk)
+       end do
+     end do
      fac = one
      if (orbs%tr_k(jk) > 0 .and. orbs%tr_k(jk) /= jk) fac = two
      ipar = kpar(jk)
@@ -532,23 +595,31 @@ contains
          if (orbs%tr_k(jk) == jk) grad(ipar) = cmplx(real(grad(ipar),dp),zero,kind=dpc)
        end do
      end do
+     ABI_FREE(acf)
+     ABI_FREE(ccf)
+     ABI_FREE(nux)
      ABI_FREE(fk)
+     ABI_FREE(fh)
    end do
    gmax = zero
    if (size(grad) > 0) gmax = maxval(abs(grad))
- end subroutine orbital_gradient
+   ABI_FREE(req%want)
+   ABI_FREE(req%ccoef)
+   ABI_FREE(req%fx)
+ end subroutine eval_point
 
  subroutine orbital_macro(e_start)
    ! Macro-iterations: ADAM rotation of the orbitals at fixed occupations, then optimization of the occupations
    real(dp),intent(in) :: e_start
    integer :: imac,icall,icall_max,extra,jk,npar,nstall,nit2,mi
    integer,allocatable :: kpar(:)
-   real(dp) :: e_old,e_new,e_prev,e_best,e_run0,lr,gmax,de
+   real(dp) :: e_old,e_new,e_prev,e_best,lr,gmax,gmax_b,de
    logical :: gconv,improved,restart,conv2
-   complex(dpc),allocatable :: grad(:),dx(:)
+   complex(dpc),allocatable :: grad(:),dx(:),grad_b(:)
    complex(dpc),allocatable :: hmat_b(:,:,:)
    real(dp),allocatable :: h1c_b(:)
    type(rdmft_adam_t) :: adam
+   type(rdmft_ints_t) :: ints_b
    type(rdmft_orbs_t) :: orbs_b
 
    ABI_MALLOC(kpar,(orbs%nkpt))
@@ -563,6 +634,7 @@ contains
      end if
    end do
    ABI_MALLOC(grad,(npar))
+   ABI_MALLOC(grad_b,(npar))
    ABI_MALLOC(dx,(npar))
    ABI_MALLOC(h1c_b,(nbk))
    ABI_MALLOC(hmat_b,(size(hmat,1),size(hmat,2),size(hmat,3)))
@@ -583,25 +655,28 @@ contains
        extra = 0
      end if
      call adam%clean()
-     e_run0 = energy_rot(orbs,h1c)
-     e_best = e_run0
-     e_prev = e_run0
+     ! energy and gradient at the start of the run (new occupations)
+     call eval_point(kpar,e_best,grad,gmax)
+     e_prev = e_best
      orbs_b = orbs
+     ints_b = ints
      h1c_b = h1c
      hmat_b = hmat
+     grad_b = grad
+     gmax_b = gmax
      gconv = .false.
      improved = .false.
      de = zero
-     gmax = zero
      do icall=1,icall_max
-       call orbital_gradient(kpar,grad,gmax)
        if (gmax < dtset%rdmft_orb_gtol) then
          gconv = .true.
          exit
        end if
        call adam%step(grad,lr,dx)
+       t0 = abi_wtime()
        call rotate_all(kpar,dx)
-       e_new = energy_rot(orbs,h1c)
+       tm(4) = tm(4)+abi_wtime()-t0
+       call eval_point(kpar,e_new,grad,gmax)
        if (dtset%prtvol >= 10) then
          write(msg,'(a,i4,a,es22.14,a,es10.2,a,es10.2)') '   ADAM ',icall,'  E = ',e_new,'  dE = ',e_new-e_prev,&
            '  max|g| = ',gmax
@@ -611,8 +686,11 @@ contains
          e_best = e_new
          improved = .true.
          orbs_b = orbs
+         ints_b = ints
          h1c_b = h1c
          hmat_b = hmat
+         grad_b = grad
+         gmax_b = gmax
        end if
        de = e_new-e_prev
        e_prev = e_new
@@ -628,11 +706,15 @@ contains
        extra = 0
      end if
      orbs = orbs_b
+     ints = ints_b
      h1c = h1c_b
      hmat = hmat_b
+     gmax = gmax_b
+     call sync_h1f()
      ! Occupations for the new orbitals
-     call refresh_ints()
+     t0 = abi_wtime()
      call optimize_occupations(nopt,e_new,conv2,nit2)
+     tm(5) = tm(5)+abi_wtime()-t0
      call assemble_nfull()
      e_new = e_new+e_ewald+e_corepsp
      write(msg,'(a,i4,a,f14.8,a,es10.2,a,es10.2,5a)') ' RDMFT: macro-iteration ',imac,'  E = ',e_new,&
@@ -653,15 +735,19 @@ contains
    end do
    write(msg,'(a,i0,a,es22.14,a)') ' RDMFT: orbital optimization finished after ',mi,' macro-iterations, E = ',e_old,ch10
    call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,5(a,f9.2))') ' RDMFT: timings (s):',' ints+Fock exchange =',tm(1),', energy =',tm(2),', Hartree Fock =',tm(3),&
+     ', rotation =',tm(4),', occupations =',tm(5)
+   call wrtout([ab_out,std_out],msg)
    call adam%free()
    call orbs_b%free()
+   call ints_b%free()
    ABI_FREE(kpar)
    ABI_FREE(grad)
+   ABI_FREE(grad_b)
    ABI_FREE(dx)
    ABI_FREE(h1c_b)
    ABI_FREE(hmat_b)
  end subroutine orbital_macro
-
 
  function diag_sum() result(dsum)
    ! Sum over the occupied orbitals of K_pp - J_pp (free and background)
@@ -756,19 +842,17 @@ contains
  end function energy_rotated
 
 
- subroutine build_fock(ikx,fx)
-   ! Generalized Fock matrix (see m_rdmft_fock) of the k-point ikx at the occupations nfull
+ subroutine build_coefs(ikx,acf,ccf,nux)
+   ! Coefficients of the energy for the bands of the k-point ikx at the occupations nfull:
+   ! acf = a_jq, ccf = c_jq (divided by N_k^2), nux = 2 n_j / N_k
    integer,intent(in) :: ikx
-   complex(dpc),intent(out) :: fx(:,:)
+   real(dp),intent(out) :: acf(:,:),ccf(:,:),nux(:)
    integer :: jb2,oj,qq,nbx,jsub,jf
    real(dp) :: ac,cc
-   real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:),hp_c(:)
+   real(dp),allocatable :: hp_c(:)
    integer,allocatable :: sub_c(:)
    logical,allocatable :: prin_c(:)
    nbx = orbs%nband(ikx,1)
-   ABI_MALLOC(acf,(nbx,nbk))
-   ABI_MALLOC(ccf,(nbx,nbk))
-   ABI_MALLOC(nux,(nbx))
    ABI_MALLOC(sub_c,(nbk))
    ABI_MALLOC(prin_c,(nbk))
    ABI_MALLOC(hp_c,(nbk))
@@ -810,14 +894,27 @@ contains
        ccf(jb2,qq) = cc/nk2
      end do
    end do
-   call rdmft_gen_fock_k(orbs,ikx,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
-                         offset,nbk,hmat(1:nbx,1:nbx,ikx),nux,acf,ccf,fx)
-   ABI_FREE(acf)
-   ABI_FREE(ccf)
-   ABI_FREE(nux)
    ABI_FREE(sub_c)
    ABI_FREE(prin_c)
    ABI_FREE(hp_c)
+ end subroutine build_coefs
+
+ subroutine build_fock(ikx,fx)
+   ! Generalized Fock matrix (see m_rdmft_fock) of the k-point ikx at the occupations nfull
+   integer,intent(in) :: ikx
+   complex(dpc),intent(out) :: fx(:,:)
+   integer :: nbx
+   real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:)
+   nbx = orbs%nband(ikx,1)
+   ABI_MALLOC(acf,(nbx,nbk))
+   ABI_MALLOC(ccf,(nbx,nbk))
+   ABI_MALLOC(nux,(nbx))
+   call build_coefs(ikx,acf,ccf,nux)
+   call rdmft_gen_fock_k(orbs,ikx,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
+                         offset,nbk,hmat(1:nbx,1:nbx,ikx),nux,acf,ccf,xmpi_world,fx)
+   ABI_FREE(acf)
+   ABI_FREE(ccf)
+   ABI_FREE(nux)
  end subroutine build_fock
 
  subroutine check_rotations(e_ref)

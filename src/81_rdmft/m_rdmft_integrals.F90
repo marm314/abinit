@@ -56,6 +56,17 @@ module m_rdmft_integrals
 !! SOURCE
 
  public :: orbs_to_real
+ public :: orb_to_real_one
+
+ !> Request of the exchange part of the generalized Fock matrices, built in the loop of the K integrals
+ type,public :: rdmft_fockreq_t
+   logical,allocatable :: want(:)
+   ! want(nkpt): the exchange part of F is built for this k-point
+   real(dp),allocatable :: ccoef(:,:,:)
+   ! ccoef(nbmax,nbk,nkpt): c_jq (divided by N_k^2) for the bands j of the k-point and all the orbitals q
+   complex(dpc),allocatable :: fx(:,:,:)
+   ! fx(nbmax,nbmax,nkpt): exchange part of F_pj (output)
+ end type rdmft_fockreq_t
 
  type,public :: rdmft_ints_t
 
@@ -213,6 +224,48 @@ subroutine orbs_to_real(orbs,ik,ngfft,mpi_enreg,ur)
 end subroutine orbs_to_real
 !!***
 
+!!****f* m_rdmft_integrals/orb_to_real_one
+!! NAME
+!!  orb_to_real_one
+!!
+!! FUNCTION
+!!  Periodic part of the band ib of the k-point ik on the real-space FFT mesh (one band).
+!!
+!! SOURCE
+subroutine orb_to_real_one(orbs,ik,ib,ngfft,mpi_enreg,ur)
+
+ !Arguments ------------------------------------
+ !scalars
+ type(rdmft_orbs_t),intent(in) :: orbs
+ integer,intent(in) :: ik,ib
+ type(MPI_type),intent(in) :: mpi_enreg
+ !arrays
+ integer,intent(in) :: ngfft(18)
+ real(dp),intent(out) :: ur(:,:)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ig,i1,i2,i3,nfft
+ !arrays
+ real(dp),allocatable :: ug(:,:)
+
+! *************************************************************************
+
+ nfft = product(ngfft(1:3))
+ ABI_MALLOC(ug,(2,nfft))
+ ug = zero
+ do ig=1,orbs%npw(ik)
+   i1 = modulo(orbs%kg(1,ig,ik),ngfft(1))
+   i2 = modulo(orbs%kg(2,ig,ik),ngfft(2))
+   i3 = modulo(orbs%kg(3,ig,ik),ngfft(3))
+   ug(:,1+i1+ngfft(1)*(i2+ngfft(2)*i3)) = orbs%cg(:,ig,ib,ik,1)
+ end do
+ call fourdp(2,ug,ur,+1,mpi_enreg,nfft,1,ngfft,0)
+ ABI_FREE(ug)
+
+end subroutine orb_to_real_one
+!!***
+
 !!****f* m_rdmft_integrals/rdmft_ints_compute
 !! NAME
 !!  rdmft_ints_compute
@@ -239,7 +292,7 @@ end subroutine orbs_to_real
 !!  ints
 !!
 !! SOURCE
-subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,free,bg,core_ints,quiet)
+subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,free,bg,core_ints,quiet,comm,req)
 
  !Arguments ------------------------------------
  !scalars
@@ -249,6 +302,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  real(dp),intent(in) :: gsqcut,rcut_j,rcut_k
  logical,intent(in) :: core_ints
  logical,optional,intent(in) :: quiet
+ integer,optional,intent(in) :: comm
+ type(rdmft_fockreq_t),optional,intent(inout) :: req
  !arrays
  integer,intent(in) :: ngfft(18)
  logical,intent(in) :: free(:),bg(:)
@@ -256,18 +311,25 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  !Local variables-------------------------------
  !scalars
  integer,parameter :: izero0=0
- integer :: ib,ik,iq,ip,jb,jk,jp,nb,nbj,nfft
+ integer :: jlo,jhi,cnt,comm_,ib,ierr,ik,iq,ip,jb,jk,jp,me,nb,nbj,nfft,nproc
+ logical :: fused,needk,wantf
+ complex(dpc),allocatable :: yy(:,:,:)
+ real(dp),allocatable :: mall(:,:,:)
  real(dp) :: kval
  logical :: fp,fq,bp,bq
  character(len=500) :: msg
  type(MPI_type) :: mpi_enreg
  !arrays
  real(dp) :: qpt(3),gmet(3,3)
- real(dp),allocatable :: prod(:,:),pgrid(:,:),rhog(:,:,:),rbg(:,:),rtmp(:,:),vc(:),vq(:,:),ui(:,:,:),uj(:,:,:)
+ real(dp),allocatable :: ui1(:,:),uj1(:,:),jtmp(:,:,:),vrho(:,:,:),prod(:,:),pgrid(:,:),rhog(:,:,:),rbg(:,:),rtmp(:,:),vc(:),vq(:,:),ui(:,:,:),uj(:,:,:)
 
 ! *************************************************************************
 
  call ints%free()
+ comm_ = xmpi_world
+ if (present(comm)) comm_ = comm
+ nproc = xmpi_comm_size(comm_)
+ me = xmpi_comm_rank(comm_)
  nfft = product(ngfft(1:3))
  gmet = orbs%gmet
 
@@ -323,19 +385,22 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ABI_MALLOC(rtmp,(2,nfft))
  ABI_MALLOC(vq,(2,nfft))
  rbg = zero
+ rhog = zero
  qpt = zero
  call barevcoul(rcut_j,icutcoul_j,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc)
  vc(1) = zero   ! G=0 is the first element of the FFT mesh: neutralizing background
 
+ ABI_MALLOC(ui1,(2,nfft))
+ cnt = 0
  do ik=1,orbs%nkpt
    nb = orbs%nband(ik,1)
-   if (.not.any(free(ints%offset(ik)+1:ints%offset(ik)+nb) .or. bg(ints%offset(ik)+1:ints%offset(ik)+nb))) cycle
-   ABI_MALLOC(ui,(2,nfft,nb))
-   call orbs_to_real(orbs,ik,ngfft,mpi_enreg,ui)
    do ib=1,nb
      ip = ints%offset(ik)+ib
      if (.not.(free(ip) .or. bg(ip))) cycle
-     prod(1,:) = ui(1,:,ib)**2+ui(2,:,ib)**2
+     cnt = cnt+1
+     if (mod(cnt,nproc) /= me) cycle
+     call orb_to_real_one(orbs,ik,ib,ngfft,mpi_enreg,ui1)
+     prod(1,:) = ui1(1,:)**2+ui1(2,:)**2
      prod(2,:) = zero
      if (free(ip)) then
        call fourdp(2,rhog(:,:,ints%free_of(ip)),prod,-1,mpi_enreg,nfft,1,ngfft,0)
@@ -345,19 +410,35 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
        ints%sjd = ints%sjd+sum(vc(:)*(rtmp(1,:)**2+rtmp(2,:)**2))/orbs%ucvol
      end if
    end do
-   ABI_FREE(ui)
  end do
+ ABI_FREE(ui1)
+ if (nproc > 1) then
+   call xmpi_sum(rhog,comm_,ierr)
+   call xmpi_sum(rbg,comm_,ierr)
+   call xmpi_sum(ints%sjd,comm_,ierr)
+ end if
 
+ ! J_pq = Re sum_G conjg(rho_p) v rho_q / Omega, all the pairs with matrix products (blocks of columns shared among
+ ! the processes)
+ ABI_MALLOC(vrho,(2,nfft,max(ints%nfree,1)))
  do iq=1,ints%nfree
-   vq(1,:) = vc(:)*rhog(1,:,iq)
-   vq(2,:) = vc(:)*rhog(2,:,iq)
-   do ip=1,iq
-     kval = sum(rhog(1,:,ip)*vq(1,:)+rhog(2,:,ip)*vq(2,:))/orbs%ucvol
-     ints%jint(ip,iq) = kval
-     ints%jint(iq,ip) = kval
-   end do
-   ints%bj(iq) = sum(vq(1,:)*rbg(1,:)+vq(2,:)*rbg(2,:))/orbs%ucvol
+   vrho(1,:,iq) = vc(:)*rhog(1,:,iq)
+   vrho(2,:,iq) = vc(:)*rhog(2,:,iq)
+   ints%bj(iq) = sum(vrho(1,:,iq)*rbg(1,:)+vrho(2,:,iq)*rbg(2,:))/orbs%ucvol
  end do
+ if (ints%nfree > 0) then
+   jlo = (me*ints%nfree)/nproc+1
+   jhi = ((me+1)*ints%nfree)/nproc
+   if (jhi >= jlo) then
+     ABI_MALLOC(jtmp,(2,ints%nfree,jhi-jlo+1))
+     call zgemm('C','N',ints%nfree,jhi-jlo+1,nfft,cone,rhog,nfft,vrho(1,1,jlo),nfft,czero,jtmp,ints%nfree)
+     ints%jint(:,jlo:jhi) = jtmp(1,:,:)/orbs%ucvol
+     ABI_FREE(jtmp)
+   end if
+   if (nproc > 1) call xmpi_sum(ints%jint,comm_,ierr)
+   ints%jint = half*(ints%jint+transpose(ints%jint))
+ end if
+ ABI_FREE(vrho)
  ! Background-background pairs: |sum_q rho_q|^2 contains the diagonal terms
  ints%sjo = sum(vc(:)*(rbg(1,:)**2+rbg(2,:)**2))/orbs%ucvol-ints%sjd
  ABI_FREE(rhog)
@@ -366,37 +447,59 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ABI_FREE(vq)
 
  ! ------------------------------------------------------------------
- ! Exchange integrals: pair densities of the needed pairs (n,k), (m,k'), k <= k'
+ ! Exchange integrals: pair densities of the needed pairs (n,k), (m,k'), k <= k'. If a request of the exchange part of
+ ! the generalized Fock matrix is present, the same pair densities are used for the k-points asked (all the k').
+ ! The pairs (k,k',q) are shared among the processes of comm.
  ! ------------------------------------------------------------------
+ fused = present(req)
+ if (fused) then
+   ABI_MALLOC(mall,(2,nfft,maxval(orbs%nband(:,1))))
+   ABI_MALLOC(yy,(nfft,maxval(orbs%nband(:,1)),1))
+   if (allocated(req%fx)) then
+     req%fx = czero
+   end if
+ end if
+ ABI_MALLOC(uj1,(2,nfft))
+ cnt = 0
  do ik=1,orbs%nkpt
    nb = orbs%nband(ik,1)
    if (.not.any(free(ints%offset(ik)+1:ints%offset(ik)+nb) .or. bg(ints%offset(ik)+1:ints%offset(ik)+nb))) cycle
+   wantf = .false.
+   if (fused) wantf = req%want(ik)
    ABI_MALLOC(ui,(2,nfft,nb))
    call orbs_to_real(orbs,ik,ngfft,mpi_enreg,ui)
-   do jk=ik,orbs%nkpt
+   do jk=1,orbs%nkpt
+     if (jk < ik .and. .not.wantf) cycle
      nbj = orbs%nband(jk,1)
      if (.not.any(free(ints%offset(jk)+1:ints%offset(jk)+nbj) .or. bg(ints%offset(jk)+1:ints%offset(jk)+nbj))) cycle
-     ABI_MALLOC(uj,(2,nfft,nbj))
-     call orbs_to_real(orbs,jk,ngfft,mpi_enreg,uj)
-
      !Coulomb kernel for q = k' - k
      qpt(:) = orbs%kpt(:,jk)-orbs%kpt(:,ik)
      call barevcoul(rcut_k,icutcoul_k,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc)
 
-     do ib=1,nb
-       ip = ints%offset(ik)+ib
-       fp = free(ip); bp = bg(ip)
-       if (.not.(fp .or. bp)) cycle
-       do jb=1,nbj
-         if (ik == jk .and. jb > ib) cycle
-         iq = ints%offset(jk)+jb
-         fq = free(iq); bq = bg(iq)
-         if (.not.(fq .or. bq)) cycle
-         if (bp .and. bq .and. .not.core_ints) cycle
+     do jb=1,nbj
+       iq = ints%offset(jk)+jb
+       fq = free(iq); bq = bg(iq)
+       if (.not.(fq .or. bq)) cycle
+       cnt = cnt+1
+       if (mod(cnt,nproc) /= me) cycle
+       call orb_to_real_one(orbs,jk,jb,ngfft,mpi_enreg,uj1)
+       do ib=1,nb
+         if (jk == ik .and. jb > ib) then
+           needk = .false.
+         else
+           needk = (jk >= ik)
+         end if
+         ip = ints%offset(ik)+ib
+         fp = free(ip); bp = bg(ip)
+         needk = needk .and. (fp .or. bp)
+         if (bp .and. bq .and. .not.core_ints) needk = .false.
+         if (.not.(needk .or. wantf)) cycle
          ! conjg(u_i) u_j
-         prod(1,:) = ui(1,:,ib)*uj(1,:,jb)+ui(2,:,ib)*uj(2,:,jb)
-         prod(2,:) = ui(1,:,ib)*uj(2,:,jb)-ui(2,:,ib)*uj(1,:,jb)
+         prod(1,:) = ui(1,:,ib)*uj1(1,:)+ui(2,:,ib)*uj1(2,:)
+         prod(2,:) = ui(1,:,ib)*uj1(2,:)-ui(2,:,ib)*uj1(1,:)
          call fourdp(2,pgrid,prod,-1,mpi_enreg,nfft,1,ngfft,0)
+         if (wantf) mall(:,:,ib) = pgrid
+         if (.not.needk) cycle
          kval = sum(vc(:)*(pgrid(1,:)**2+pgrid(2,:)**2))/orbs%ucvol
          if (fp .and. fq) then
            ints%kint(ints%free_of(ip),ints%free_of(iq)) = kval
@@ -414,11 +517,30 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
            end if
          end if
        end do
+       if (wantf) then
+           ! F_pj += sum_G conjg(M_p) Y_j,  Y_j = -2 c_jq / Omega v M_j
+           do ib=1,nb
+             yy(:,ib,1) = cmplx(-two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(1,:,ib), &
+                                -two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(2,:,ib),kind=dpc)
+           end do
+           call zgemm('C','N',nb,nb,nfft,cone,mall,nfft,yy,nfft,cone,req%fx(1,1,ik),size(req%fx,1))
+       end if
      end do
-     ABI_FREE(uj)
    end do
    ABI_FREE(ui)
  end do
+ if (nproc > 1) then
+   call xmpi_sum(ints%kint,comm_,ierr)
+   call xmpi_sum(ints%bk,comm_,ierr)
+   call xmpi_sum(ints%sko,comm_,ierr)
+   call xmpi_sum(ints%skd,comm_,ierr)
+   if (fused) call xmpi_sum(req%fx,comm_,ierr)
+ end if
+ ABI_FREE(uj1)
+ if (fused) then
+   ABI_FREE(mall)
+   ABI_FREE(yy)
+ end if
 
  ABI_FREE(prod)
  ABI_FREE(pgrid)

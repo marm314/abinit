@@ -43,7 +43,8 @@ module m_rdmft_fock
  use m_barevcoul,        only : barevcoul
  use m_fft,              only : fourdp
  use m_mpinfo,           only : destroy_mpi_enreg, initmpi_seq
- use m_rdmft_integrals,  only : orbs_to_real
+ use m_xmpi
+ use m_rdmft_integrals,  only : orbs_to_real, orb_to_real_one
  use m_rdmft_orbitals,   only : rdmft_orbs_t
 
  implicit none
@@ -52,9 +53,238 @@ module m_rdmft_fock
 !!***
 
  public :: rdmft_gen_fock_k
+ public :: rdmft_fock_hartree_k
+ public :: rdmft_fock_exchange_k
 !!***
 
 contains
+!!***
+
+!!****f* m_rdmft_fock/rdmft_fock_hartree_k
+!! NAME
+!!  rdmft_fock_hartree_k
+!!
+!! FUNCTION
+!!  Hartree part of the generalized Fock matrix of the k-point ik:
+!!  (2/Omega) sum_G v_J(G) conjg(M_pj(G)) W_j(G), with W_j(G) = sum_q a_jq rho_qq(G).
+!!  The work is shared among the processes of comm (the result is the same in all of them).
+!!
+!! INPUTS
+!!  orbs <type(rdmft_orbs_t)> = orbitals
+!!  ik = k-point
+!!  ngfft(18), gsqcut = FFT mesh and G^2 cut-off of the density
+!!  icutcoul_j, rcut_j = Coulomb kernel of J
+!!  offset(nkpt) = composite index offsets, nbk = number of orbitals
+!!  acoef(nb,nbk) = a_jq (already divided by N_k^2) for the bands j of ik and all the orbitals q
+!!  comm = MPI communicator
+!!
+!! OUTPUT
+!!  fock(nb,nb) = Hartree part of F_pj
+!!
+!! SOURCE
+subroutine rdmft_fock_hartree_k(orbs,ik,ngfft,gsqcut,icutcoul_j,rcut_j,offset,nbk,acoef,comm,fock)
+
+ !Arguments ------------------------------------
+ !scalars
+ type(rdmft_orbs_t),intent(in) :: orbs
+ integer,intent(in) :: ik,icutcoul_j,nbk,comm
+ real(dp),intent(in) :: gsqcut,rcut_j
+ !arrays
+ integer,intent(in) :: ngfft(18),offset(orbs%nkpt)
+ real(dp),intent(in) :: acoef(:,:)
+ complex(dpc),intent(out) :: fock(:,:)
+
+ !Local variables-------------------------------
+ !scalars
+ integer,parameter :: izero0=0
+ integer :: ib,ierr,iq,j,jk,nb,nbj,nfft,nproc,me,cnt
+ type(MPI_type) :: mpi_enreg
+ !arrays
+ real(dp) :: gmet(3,3),qpt(3)
+ real(dp),allocatable :: mall(:,:,:),prod(:,:),rho(:,:),ujl(:,:),uk(:,:,:),vc0(:),wj(:,:,:),yy(:,:,:)
+
+! *************************************************************************
+
+ nb = orbs%nband(ik,1)
+ nfft = product(ngfft(1:3))
+ gmet = orbs%gmet
+ nproc = xmpi_comm_size(comm)
+ me = xmpi_comm_rank(comm)
+ fock = czero
+ if (size(acoef,2) /= nbk .or. size(acoef,1) /= nb) then
+   ABI_BUG('RDMFT: inconsistent size of the coefficients of the generalized Fock matrix.')
+ end if
+
+ call initmpi_seq(mpi_enreg)
+ call mpi_enreg%distribfft%init_seq('c',ngfft(2),ngfft(3),'all')
+ call mpi_enreg%distribfft%init_seq('f',ngfft(2),ngfft(3),'all')
+
+ ABI_MALLOC(prod,(2,nfft))
+ ABI_MALLOC(ujl,(2,nfft))
+ ABI_MALLOC(rho,(2,nfft))
+ ABI_MALLOC(vc0,(nfft))
+ ABI_MALLOC(uk,(2,nfft,nb))
+ ABI_MALLOC(mall,(2,nfft,nb))
+ ABI_MALLOC(wj,(2,nfft,nb))
+ ABI_MALLOC(yy,(2,nfft,nb))
+ call orbs_to_real(orbs,ik,ngfft,mpi_enreg,uk)
+
+ qpt = zero
+ call barevcoul(rcut_j,icutcoul_j,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc0)
+ vc0(1) = zero
+
+ ! W_j(G): the orbitals q are shared among the processes
+ wj = zero
+ cnt = 0
+ do jk=1,orbs%nkpt
+   nbj = orbs%nband(jk,1)
+   if (.not.any(abs(acoef(:,offset(jk)+1:offset(jk)+nbj)) > zero)) cycle
+   do ib=1,nbj
+     iq = offset(jk)+ib
+     if (.not.any(abs(acoef(:,iq)) > zero)) cycle
+     cnt = cnt+1
+     if (mod(cnt,nproc) /= me) cycle
+     call orb_to_real_one(orbs,jk,ib,ngfft,mpi_enreg,ujl)
+     prod(1,:) = ujl(1,:)**2+ujl(2,:)**2
+     prod(2,:) = zero
+     call fourdp(2,rho,prod,-1,mpi_enreg,nfft,1,ngfft,0)
+     do j=1,nb
+       if (acoef(j,iq) /= zero) wj(:,:,j) = wj(:,:,j)+acoef(j,iq)*rho(:,:)
+     end do
+   end do
+ end do
+ if (nproc > 1) call xmpi_sum(wj,comm,ierr)
+
+ ! F_pj = (2/Omega) sum_G vc0 conjg(M_pj) W_j: the columns j are shared among the processes
+ do j=1,nb
+   if (mod(j,nproc) /= me) cycle
+   do ib=1,nb
+     prod(1,:) = uk(1,:,ib)*uk(1,:,j)+uk(2,:,ib)*uk(2,:,j)
+     prod(2,:) = uk(1,:,ib)*uk(2,:,j)-uk(2,:,ib)*uk(1,:,j)
+     call fourdp(2,mall(:,:,ib),prod,-1,mpi_enreg,nfft,1,ngfft,0)
+   end do
+   do ib=1,nfft
+     yy(1,ib,1) = vc0(ib)*wj(1,ib,j)
+     yy(2,ib,1) = vc0(ib)*wj(2,ib,j)
+   end do
+   call zgemm('C','N',nb,1,nfft,dcmplx(two/orbs%ucvol,zero),mall,nfft,yy(1,1,1),nfft,czero,fock(1,j),nb)
+ end do
+ if (nproc > 1) call xmpi_sum(fock,comm,ierr)
+
+ ABI_FREE(prod)
+ ABI_FREE(ujl)
+ ABI_FREE(rho)
+ ABI_FREE(vc0)
+ ABI_FREE(uk)
+ ABI_FREE(mall)
+ ABI_FREE(wj)
+ ABI_FREE(yy)
+ call destroy_mpi_enreg(mpi_enreg)
+
+end subroutine rdmft_fock_hartree_k
+!!***
+
+!!****f* m_rdmft_fock/rdmft_fock_exchange_k
+!! NAME
+!!  rdmft_fock_exchange_k
+!!
+!! FUNCTION
+!!  Exchange part of the generalized Fock matrix of the k-point ik:
+!!  -2 sum_q c_jq (1/Omega) sum_G v_K(k_q-k+G) conjg(M_pq(G)) M_jq(G).
+!!  The orbitals q are shared among the processes of comm. (The integrals routine rdmft_ints_t%compute can build the
+!!  same matrix in the same loop as the K integrals, from the same pair densities.)
+!!
+!! INPUTS
+!!  orbs, ik, ngfft, gsqcut, offset, nbk, comm = as in rdmft_fock_hartree_k
+!!  icutcoul_k, rcut_k = Coulomb kernel of K
+!!  ccoef(nb,nbk) = c_jq (already divided by N_k^2)
+!!
+!! OUTPUT
+!!  fock(nb,nb) = exchange part of F_pj
+!!
+!! SOURCE
+subroutine rdmft_fock_exchange_k(orbs,ik,ngfft,gsqcut,icutcoul_k,rcut_k,offset,nbk,ccoef,comm,fock)
+
+ !Arguments ------------------------------------
+ !scalars
+ type(rdmft_orbs_t),intent(in) :: orbs
+ integer,intent(in) :: ik,icutcoul_k,nbk,comm
+ real(dp),intent(in) :: gsqcut,rcut_k
+ !arrays
+ integer,intent(in) :: ngfft(18),offset(orbs%nkpt)
+ real(dp),intent(in) :: ccoef(:,:)
+ complex(dpc),intent(out) :: fock(:,:)
+
+ !Local variables-------------------------------
+ !scalars
+ integer,parameter :: izero0=0
+ integer :: ib,ierr,iq,j,jk,nb,nbj,nfft,nproc,me,cnt
+ type(MPI_type) :: mpi_enreg
+ !arrays
+ real(dp) :: gmet(3,3),qpt(3)
+ real(dp),allocatable :: mall(:,:,:),prod(:,:),ujl(:,:),uk(:,:,:),vc(:),yy(:,:,:)
+
+! *************************************************************************
+
+ nb = orbs%nband(ik,1)
+ nfft = product(ngfft(1:3))
+ gmet = orbs%gmet
+ nproc = xmpi_comm_size(comm)
+ me = xmpi_comm_rank(comm)
+ fock = czero
+ if (size(ccoef,2) /= nbk .or. size(ccoef,1) /= nb) then
+   ABI_BUG('RDMFT: inconsistent size of the coefficients of the generalized Fock matrix.')
+ end if
+
+ call initmpi_seq(mpi_enreg)
+ call mpi_enreg%distribfft%init_seq('c',ngfft(2),ngfft(3),'all')
+ call mpi_enreg%distribfft%init_seq('f',ngfft(2),ngfft(3),'all')
+
+ ABI_MALLOC(prod,(2,nfft))
+ ABI_MALLOC(ujl,(2,nfft))
+ ABI_MALLOC(vc,(nfft))
+ ABI_MALLOC(uk,(2,nfft,nb))
+ ABI_MALLOC(mall,(2,nfft,nb))
+ ABI_MALLOC(yy,(2,nfft,nb))
+ call orbs_to_real(orbs,ik,ngfft,mpi_enreg,uk)
+
+ cnt = 0
+ do jk=1,orbs%nkpt
+   nbj = orbs%nband(jk,1)
+   if (.not.any(abs(ccoef(:,offset(jk)+1:offset(jk)+nbj)) > zero)) cycle
+   qpt(:) = orbs%kpt(:,jk)-orbs%kpt(:,ik)
+   call barevcoul(rcut_k,icutcoul_k,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc)
+   do ib=1,nbj
+     iq = offset(jk)+ib
+     if (.not.any(abs(ccoef(:,iq)) > zero)) cycle
+     cnt = cnt+1
+     if (mod(cnt,nproc) /= me) cycle
+     call orb_to_real_one(orbs,jk,ib,ngfft,mpi_enreg,ujl)
+     ! M_pq(G) for all the bands p of k with the orbital q
+     do j=1,nb
+       prod(1,:) = uk(1,:,j)*ujl(1,:)+uk(2,:,j)*ujl(2,:)
+       prod(2,:) = uk(1,:,j)*ujl(2,:)-uk(2,:,j)*ujl(1,:)
+       call fourdp(2,mall(:,:,j),prod,-1,mpi_enreg,nfft,1,ngfft,0)
+     end do
+     ! Y_j = -2 c_jq / Omega v M_jq ;  F_pj += sum_G conjg(M_p) Y_j
+     do j=1,nb
+       yy(1,:,j) = (-two*ccoef(j,iq)/orbs%ucvol)*vc(:)*mall(1,:,j)
+       yy(2,:,j) = (-two*ccoef(j,iq)/orbs%ucvol)*vc(:)*mall(2,:,j)
+     end do
+     call zgemm('C','N',nb,nb,nfft,cone,mall,nfft,yy,nfft,cone,fock,nb)
+   end do
+ end do
+ if (nproc > 1) call xmpi_sum(fock,comm,ierr)
+
+ ABI_FREE(prod)
+ ABI_FREE(ujl)
+ ABI_FREE(vc)
+ ABI_FREE(uk)
+ ABI_FREE(mall)
+ ABI_FREE(yy)
+ call destroy_mpi_enreg(mpi_enreg)
+
+end subroutine rdmft_fock_exchange_k
 !!***
 
 !!****f* m_rdmft_fock/rdmft_gen_fock_k
@@ -62,7 +292,8 @@ contains
 !!  rdmft_gen_fock_k
 !!
 !! FUNCTION
-!!  Generalized Fock matrix F_pj (p,j = bands of the k-point ik) of the energy above.
+!!  Generalized Fock matrix F_pj (p,j = bands of the k-point ik) of the energy above: one-electron, Hartree and
+!!  exchange parts.
 !!
 !! INPUTS
 !!  orbs <type(rdmft_orbs_t)> = orbitals
@@ -73,17 +304,18 @@ contains
 !!  hk(nb,nb) = <i|h|j> of the bands of ik
 !!  nu(nb) = 2 n_j / N_k
 !!  acoef(nb,nbk), ccoef(nb,nbk) = a_jq and c_jq (already divided by N_k^2) for the bands j of ik and all the orbitals q
+!!  comm = MPI communicator
 !!
 !! OUTPUT
 !!  fock(nb,nb) = F_pj
 !!
 !! SOURCE
-subroutine rdmft_gen_fock_k(orbs,ik,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,offset,nbk,hk,nu,acoef,ccoef,fock)
+subroutine rdmft_gen_fock_k(orbs,ik,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,offset,nbk,hk,nu,acoef,ccoef,comm,fock)
 
  !Arguments ------------------------------------
  !scalars
  type(rdmft_orbs_t),intent(in) :: orbs
- integer,intent(in) :: ik,icutcoul_j,icutcoul_k,nbk
+ integer,intent(in) :: ik,icutcoul_j,icutcoul_k,nbk,comm
  real(dp),intent(in) :: gsqcut,rcut_j,rcut_k
  !arrays
  integer,intent(in) :: ngfft(18),offset(orbs%nkpt)
@@ -93,136 +325,22 @@ subroutine rdmft_gen_fock_k(orbs,ik,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rc
 
  !Local variables-------------------------------
  !scalars
- integer,parameter :: izero0=0
- integer :: ib,ig,iq,j,jk,nb,nbj,nfft,p
- real(dp) :: cj,fac
- complex(dpc) :: acc
- type(MPI_type) :: mpi_enreg
+ integer :: j,nb,p
  !arrays
- real(dp) :: gmet(3,3),qpt(3)
- real(dp),allocatable :: mall(:,:,:),prod(:,:),rho(:,:),uj(:,:,:),uk(:,:,:),vc(:),vc0(:),wj(:,:,:),yy(:,:)
+ complex(dpc),allocatable :: fx(:,:)
 
 ! *************************************************************************
 
  nb = orbs%nband(ik,1)
- nfft = product(ngfft(1:3))
- gmet = orbs%gmet
- fock = czero
- if (size(acoef,2) /= nbk .or. size(ccoef,2) /= nbk .or. size(acoef,1) /= nb) then
-   ABI_BUG('RDMFT: inconsistent size of the coefficients of the generalized Fock matrix.')
- end if
-
- call initmpi_seq(mpi_enreg)
- call mpi_enreg%distribfft%init_seq('c',ngfft(2),ngfft(3),'all')
- call mpi_enreg%distribfft%init_seq('f',ngfft(2),ngfft(3),'all')
-
- ! One-electron part: nu_j h_jp
+ ABI_MALLOC(fx,(nb,nb))
+ call rdmft_fock_hartree_k(orbs,ik,ngfft,gsqcut,icutcoul_j,rcut_j,offset,nbk,acoef,comm,fock)
+ call rdmft_fock_exchange_k(orbs,ik,ngfft,gsqcut,icutcoul_k,rcut_k,offset,nbk,ccoef,comm,fx)
  do j=1,nb
    do p=1,nb
-     fock(p,j) = nu(j)*hk(j,p)
+     fock(p,j) = fock(p,j)+fx(p,j)+nu(j)*hk(j,p)
    end do
  end do
-
- ABI_MALLOC(prod,(2,nfft))
- ABI_MALLOC(rho,(2,nfft))
- ABI_MALLOC(vc,(nfft))
- ABI_MALLOC(vc0,(nfft))
- ABI_MALLOC(uk,(2,nfft,nb))
- ABI_MALLOC(mall,(2,nfft,nb))
- ABI_MALLOC(wj,(2,nfft,nb))
- ABI_MALLOC(yy,(2,nfft))
- call orbs_to_real(orbs,ik,ngfft,mpi_enreg,uk)
-
- qpt = zero
- call barevcoul(rcut_j,icutcoul_j,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc0)
- vc0(1) = zero
-
- ! ------------------------------------------------------------------
- ! W_j(G) = sum_q a_jq rho_qq(G) and the Hartree part of F
- ! ------------------------------------------------------------------
- wj = zero
- do jk=1,orbs%nkpt
-   nbj = orbs%nband(jk,1)
-   if (.not.any(abs(acoef(:,offset(jk)+1:offset(jk)+nbj)) > zero)) cycle
-   ABI_MALLOC(uj,(2,nfft,nbj))
-   call orbs_to_real(orbs,jk,ngfft,mpi_enreg,uj)
-   do ib=1,nbj
-     iq = offset(jk)+ib
-     if (.not.any(abs(acoef(:,iq)) > zero)) cycle
-     prod(1,:) = uj(1,:,ib)**2+uj(2,:,ib)**2
-     prod(2,:) = zero
-     call fourdp(2,rho,prod,-1,mpi_enreg,nfft,1,ngfft,0)
-     do j=1,nb
-       if (acoef(j,iq) /= zero) wj(:,:,j) = wj(:,:,j)+acoef(j,iq)*rho(:,:)
-     end do
-   end do
-   ABI_FREE(uj)
- end do
- do j=1,nb
-   ! M_pj(G) of all the bands p of k with the band j
-   do p=1,nb
-     prod(1,:) = uk(1,:,p)*uk(1,:,j)+uk(2,:,p)*uk(2,:,j)
-     prod(2,:) = uk(1,:,p)*uk(2,:,j)-uk(2,:,p)*uk(1,:,j)
-     call fourdp(2,mall(:,:,p),prod,-1,mpi_enreg,nfft,1,ngfft,0)
-   end do
-   do p=1,nb
-     ! (2/Omega) sum_G vJ(G) conjg(M_pj(G)) W_j(G)
-     acc = czero
-     do ig=1,nfft
-       if (vc0(ig) == zero) cycle
-       acc = acc+vc0(ig)*cmplx(mall(1,ig,p)*wj(1,ig,j)+mall(2,ig,p)*wj(2,ig,j), &
-                               mall(1,ig,p)*wj(2,ig,j)-mall(2,ig,p)*wj(1,ig,j),kind=dpc)
-     end do
-     fock(p,j) = fock(p,j)+two*acc/orbs%ucvol
-   end do
- end do
-
- ! ------------------------------------------------------------------
- ! Exchange part: -2 sum_q c_jq (1/Omega) sum_G vK conjg(M_pq(G)) M_jq(G)
- ! ------------------------------------------------------------------
- do jk=1,orbs%nkpt
-   nbj = orbs%nband(jk,1)
-   if (.not.any(abs(ccoef(:,offset(jk)+1:offset(jk)+nbj)) > zero)) cycle
-   ABI_MALLOC(uj,(2,nfft,nbj))
-   call orbs_to_real(orbs,jk,ngfft,mpi_enreg,uj)
-   qpt(:) = orbs%kpt(:,jk)-orbs%kpt(:,ik)
-   call barevcoul(rcut_k,icutcoul_k,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc)
-   do ib=1,nbj
-     iq = offset(jk)+ib
-     if (.not.any(abs(ccoef(:,iq)) > zero)) cycle
-     ! M_pq(G) for all the bands p of k with the orbital q
-     do p=1,nb
-       prod(1,:) = uk(1,:,p)*uj(1,:,ib)+uk(2,:,p)*uj(2,:,ib)
-       prod(2,:) = uk(1,:,p)*uj(2,:,ib)-uk(2,:,p)*uj(1,:,ib)
-       call fourdp(2,mall(:,:,p),prod,-1,mpi_enreg,nfft,1,ngfft,0)
-     end do
-     do j=1,nb
-       cj = ccoef(j,iq)
-       if (cj == zero) cycle
-       yy(1,:) = vc(:)*mall(1,:,j)
-       yy(2,:) = vc(:)*mall(2,:,j)
-       fac = -two*cj/orbs%ucvol
-       do p=1,nb
-         acc = czero
-         do ig=1,nfft
-           acc = acc+cmplx(mall(1,ig,p)*yy(1,ig)+mall(2,ig,p)*yy(2,ig),mall(1,ig,p)*yy(2,ig)-mall(2,ig,p)*yy(1,ig),kind=dpc)
-         end do
-         fock(p,j) = fock(p,j)+fac*acc
-       end do
-     end do
-   end do
-   ABI_FREE(uj)
- end do
-
- ABI_FREE(prod)
- ABI_FREE(rho)
- ABI_FREE(vc)
- ABI_FREE(vc0)
- ABI_FREE(uk)
- ABI_FREE(mall)
- ABI_FREE(wj)
- ABI_FREE(yy)
- call destroy_mpi_enreg(mpi_enreg)
+ ABI_FREE(fx)
 
 end subroutine rdmft_gen_fock_k
 !!***
