@@ -155,9 +155,13 @@ subroutine rdmft_fock_hartree_k(orbs,ik,ngfft,gsqcut,icutcoul_j,rcut_j,offset,nb
  end do
  if (nproc > 1) call xmpi_sum(wj,comm,ierr)
 
- ! F_pj = (2/Omega) sum_G vc0 conjg(M_pj) W_j: the columns j are shared among the processes
+ ! F_pj = (2/Omega) sum_G vc0 conjg(M_pj) W_j: the columns j without couplings (W_j = 0) are skipped and the others
+ ! are shared among the processes
+ cnt = 0
  do j=1,nb
-   if (mod(j,nproc) /= me) cycle
+   if (.not.any(abs(acoef(j,:)) > zero)) cycle
+   cnt = cnt+1
+   if (mod(cnt,nproc) /= me) cycle
    do ib=1,nb
      prod(1,:) = uk(1,:,ib)*uk(1,:,j)+uk(2,:,ib)*uk(2,:,j)
      prod(2,:) = uk(1,:,ib)*uk(2,:,j)-uk(2,:,ib)*uk(1,:,j)

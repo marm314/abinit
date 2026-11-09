@@ -939,7 +939,13 @@ contains
      do ib2=1,nb2
        relev(offset(jk)+ib2) = (nk2*max(maxval(abs(acf(ib2,:))),maxval(abs(ccf(ib2,:)))) >= dtset%rdmft_occ_skip)
      end do
-     if (kpar(jk) >= 0) req%ccoef(1:nb2,:,jk) = ccf
+     if (kpar(jk) >= 0) then
+       ! the rows of the orbitals without couplings are dropped as well (the one-electron term is kept by the caller)
+       do ib2=1,nb2
+         if (.not.relev(offset(jk)+ib2)) ccf(ib2,:) = zero
+       end do
+       req%ccoef(1:nb2,:,jk) = ccf
+     end if
      ABI_FREE(acf)
      ABI_FREE(ccf)
      ABI_FREE(nux)
@@ -973,6 +979,9 @@ contains
      call build_coefs(jk,acf,ccf,nux)
      do ib2=1,nbk
        if (.not.relev(ib2)) acf(:,ib2) = zero
+     end do
+     do ib2=1,nb2
+       if (.not.relev(offset(jk)+ib2)) acf(ib2,:) = zero
      end do
      t0 = abi_wtime()
      call rdmft_fock_hartree_k(orbs,jk,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,offset,nbk,acf,xmpi_world,fh)
@@ -1065,6 +1074,12 @@ contains
        ccs(:,ib2) = zero
      end if
    end do
+   do ib2=1,nb2
+     if (.not.relv(offset(k0)+ib2)) then
+       acs(ib2,:) = zero
+       ccs(ib2,:) = zero
+     end if
+   end do
    call rdmft_gen_fock_k(orbs,k0,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
                          offset,nbk,hmat(1:nb2,1:nb2,k0),nux,acf,ccf,xmpi_world,fa)
    call rdmft_gen_fock_k(orbs,k0,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
@@ -1108,7 +1123,7 @@ contains
    real(dp),intent(in) :: e_start
    integer :: imac,icall,icall_max,extra,jk,nadam,npar,nstall,nit2,mi
    integer,allocatable :: kpar(:)
-   real(dp) :: e_old,e_new,e_prev,e_best,lr,gmax,gmax_b,de
+   real(dp) :: e_old,e_new,e_prev,e_best,e_run0,lr,gmax,gmax_b,de
    logical :: gconv,improved,restart,conv2
    character(len=120) :: stat
    complex(dpc),allocatable :: grad(:),dx(:),grad_b(:)
@@ -1155,6 +1170,7 @@ contains
      call adam%clean()
      ! energy and gradient at the start of the run (new occupations)
      call eval_point(kpar,e_best,grad,gmax)
+     e_run0 = e_best
      e_prev = e_best
      write(msg,'(a,i0,a,i0,a,es9.2,a,i0,a,i0,a)') ch10//' ADAM orbital rotations, macro-iteration ',imac,' (at most ',&
        icall_max,' iterations, learning rate ',lr,'); orbitals kept in the pair sums: ',nrel_last,' of ',nbk,' (rdmft_occ_skip)'
@@ -1208,7 +1224,10 @@ contains
        gmax_b = gmax
      end if
      ! No improvement although the energy still moves: restart from the best point with a smaller learning rate
-     restart = (.not.improved .and. .not.gconv .and. abs(de) > dtset%rdmft_orb_etol)
+     ! A run that ends without converging the gradient and without lowering the energy by more than the tolerance is limited by
+     ! the noise of ADAM at this learning rate: the learning rate is reduced for the next run
+     restart = (.not.gconv) .and. ((.not.improved .and. abs(de) > dtset%rdmft_orb_etol) .or. &
+                                   (e_run0-e_best < dtset%rdmft_orb_etol))
      if (restart) then
        lr = lr*dtset%rdmft_adam_rate
        extra = extra+dtset%rdmft_adam_incr
@@ -1242,6 +1261,12 @@ contains
        e_old = e_new
        exit
      end if
+     if (lr < 1.0e-6_dp*dtset%rdmft_adam_lr) then
+       write(msg,'(a,es9.2,a)') ' RDMFT: the learning rate of ADAM reached its floor (',lr,'); the orbital optimization is stopped'
+       call wrtout([ab_out,std_out],msg)
+       e_old = e_new
+       exit
+     end if
      if (nstall >= 10) then
        e_old = e_new
        exit
@@ -1256,7 +1281,7 @@ contains
      ', rotation =',tm(4),', occupations =',tm(5)
    call wrtout([ab_out,std_out],msg)
    if (dtset%rdmft_occ_skip > zero) call spot_check(kpar)
-   call check_h()
+   if (dtset%prtvol >= 10) call check_h()
    call adam%free()
    call orbs_b%free()
    ABI_FREE(kpar)

@@ -20071,7 +20071,7 @@ Variable(
     characteristics=["[[DEVELOP]]"],
     added_in_version="10.9.3",
     text=r"""
-Factor that multiplies the ADAM learning rate [[rdmft_adam_lr]] after a run that did not lower the energy.
+Factor that multiplies the ADAM learning rate [[rdmft_adam_lr]] after a run that did not lower the energy, and also after a run that ended without converging the gradient ([[rdmft_orb_gtol]]) and without lowering the energy by more than [[rdmft_orb_etol]]: ADAM at a fixed learning rate has a noise floor of the order of its step. The orbital optimization stops if the learning rate falls below 1e-6 of [[rdmft_adam_lr]].
 """,
 ),
 
