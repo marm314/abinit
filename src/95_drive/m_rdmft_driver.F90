@@ -45,7 +45,7 @@ module m_rdmft_driver
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_fock,        only : rdmft_fock_hartree_k
  use m_mpinfo,            only : destroy_mpi_enreg, initmpi_seq
- use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t, rdmft_tint, rdmft_tprof
+ use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t, rdmft_mem_on, rdmft_tint, rdmft_tprof
  use m_rdmft_optimizer,   only : rdmft_grad_jk, rdmft_optimize_jk, rdmft_optimize_pnof, rdmft_tpnof
  use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
  use m_specialmsg,        only : wrtout
@@ -965,7 +965,7 @@ contains
    integer,intent(in) :: kpar(:)
    real(dp),intent(out) :: e_out,gmax
    complex(dpc),intent(out) :: grad(:)
-   integer :: ib2,iq2,jk,ipar,pp,qq,nb2,nbmax,ncol,nrmax,nrow
+   integer :: ib2,iq2,jk,ipar,pp,qq,nb2,nbmax,ncol,nrow
    real(dp) :: fac
    logical,allocatable :: relev(:)
    complex(dpc) :: dg
@@ -973,6 +973,7 @@ contains
    real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:)
    type(rdmft_fockreq_t) :: req
    nbmax = maxval(orbs%nband(:,1))
+   if (nmem_eval < 2) call report_mem('ORB: eval_point start')
    ABI_MALLOC(req%want,(orbs%nkpt))
    ABI_MALLOC(req%fx,(nbmax,nbmax,orbs%nkpt))
    req%want = (kpar >= 0)
@@ -992,6 +993,7 @@ contains
      ABI_FREE(ccf)
      ABI_FREE(nux)
    end do
+   if (nmem_eval < 2) call report_mem('ORB: eval_point after the relevance pass')
    ! The couplings are stored only between relevant bands (rows) and relevant orbitals (columns): the memory does not grow
    ! with the square of the number of orbitals of the complete basis
    ABI_MALLOC(req%rowmap,(nbmax,orbs%nkpt))
@@ -1005,18 +1007,16 @@ contains
        req%colmap(ib2) = ncol
      end if
    end do
-   nrmax = 0
+   nrow = 0
    do jk=1,orbs%nkpt
-     nrow = 0
      do ib2=1,orbs%nband(jk,1)
        if (relev(offset(jk)+ib2)) then
          nrow = nrow+1
          req%rowmap(ib2,jk) = nrow
        end if
      end do
-     nrmax = max(nrmax,nrow)
    end do
-   ABI_MALLOC(req%ccoef,(max(nrmax,1),max(ncol,1),orbs%nkpt))
+   ABI_MALLOC(req%ccoef,(max(nrow,1),max(ncol,1)))
    req%ccoef = zero
    do jk=1,orbs%nkpt
      if (kpar(jk) < 0) cycle
@@ -1028,7 +1028,7 @@ contains
      do ib2=1,nb2
        if (req%rowmap(ib2,jk) == 0) cycle
        do iq2=1,nbk
-         if (req%colmap(iq2) > 0) req%ccoef(req%rowmap(ib2,jk),req%colmap(iq2),jk) = ccf(ib2,iq2)
+         if (req%colmap(iq2) > 0) req%ccoef(req%rowmap(ib2,jk),req%colmap(iq2)) = ccf(ib2,iq2)
        end do
      end do
      ABI_FREE(acf)
@@ -1036,11 +1036,14 @@ contains
      ABI_FREE(nux)
    end do
    nrel_last = count(relev)
+   if (nmem_eval < 2) call report_mem('ORB: eval_point after the coupling arrays')
    t0 = abi_wtime()
+   rdmft_mem_on = (nmem_eval < 2 .and. dtset%prtvol >= 5)
    call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
                      dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,req=req,rel=relev,&
                      reduce=(dtset%rdmft_tr_reduce == 1))
    tm(1) = tm(1)+abi_wtime()-t0
+   rdmft_mem_on = .false.
    nmem_eval = nmem_eval+1
    if (nmem_eval <= 2) call report_mem('ORB: eval_point after the integrals and Fock exchange')
    t0 = abi_wtime()

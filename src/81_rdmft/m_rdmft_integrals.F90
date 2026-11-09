@@ -38,6 +38,7 @@ module m_rdmft_integrals
  use m_fft,              only : fourdp
  use m_mpinfo,           only : destroy_mpi_enreg, initmpi_seq
  use m_rdmft_orbitals,   only : rdmft_orbs_t
+ use m_io_tools,         only : get_unit
  use m_specialmsg,       only : wrtout
  use m_time,              only : abi_wtime
 
@@ -59,6 +60,11 @@ module m_rdmft_integrals
  public :: orbs_to_real
  public :: rdmft_tint
  public :: rdmft_tprof
+ public :: rdmft_mem_on
+ public :: rdmft_mem_report
+
+ !> Debug: print the memory of the process inside rdmft_ints_compute (set by the driver)
+ logical,save :: rdmft_mem_on = .false.
  public :: orb_to_real_one
 
  !> Accumulated wall times (s) of the phases of rdmft_ints_compute on this process: 1 densities, 2 sum of the densities,
@@ -72,10 +78,10 @@ module m_rdmft_integrals
  type,public :: rdmft_fockreq_t
    logical,allocatable :: want(:)
    ! want(nkpt): the exchange part of F is built for this k-point
-   real(dp),allocatable :: ccoef(:,:,:)
-   ! ccoef(nrow,ncol,nkpt): c_jq (divided by N_k^2) between the relevant bands j of the k-point and the relevant orbitals q
+   real(dp),allocatable :: ccoef(:,:)
+   ! ccoef(nrow,ncol): c_jq (divided by N_k^2) between the relevant bands j (all the k-points) and the relevant orbitals q
    integer,allocatable :: rowmap(:,:)
-   ! rowmap(nbmax,nkpt): row of ccoef of each band of each k-point (0 = no coupling)
+   ! rowmap(nbmax,nkpt): row of ccoef of each band of each k-point (0 = no coupling); the rows of all the k-points are stacked
    integer,allocatable :: colmap(:)
    ! colmap(nbk): column of ccoef of each orbital (0 = no coupling)
    complex(dpc),allocatable :: fx(:,:,:)
@@ -280,6 +286,45 @@ subroutine orb_to_real_one(orbs,ik,ib,ngfft,mpi_enreg,ur)
 end subroutine orb_to_real_one
 !!***
 
+!!****f* m_rdmft_integrals/rdmft_mem_report
+!! NAME
+!!  rdmft_mem_report
+!!
+!! FUNCTION
+!!  Print the peak and the current resident memory of this process (Linux /proc/self/status), if rdmft_mem_on is set.
+!!
+!! SOURCE
+subroutine rdmft_mem_report(label)
+
+ character(len=*),intent(in) :: label
+ character(len=200) :: line
+ character(len=60) :: hwm,rss
+ character(len=500) :: msg
+ integer :: ios,unt
+
+! *************************************************************************
+
+ if (.not.rdmft_mem_on) return
+ hwm = '?'; rss = '?'
+ unt = get_unit()
+ open(unit=unt,file='/proc/self/status',status='old',action='read',iostat=ios)
+ if (ios == 0) then
+   do
+     read(unt,'(a)',iostat=ios) line
+     if (ios /= 0) exit
+     if (line(1:6) == 'VmHWM:') hwm = adjustl(line(7:))
+     if (line(1:6) == 'VmRSS:') rss = adjustl(line(7:))
+   end do
+   close(unt)
+ end if
+ if (xmpi_comm_rank(xmpi_world) == 0) then
+   write(msg,'(4a)') '     memory (master) ',trim(label),': peak '//trim(hwm)//', current ',trim(rss)
+   call wrtout(std_out,msg)
+ end if
+
+end subroutine rdmft_mem_report
+!!***
+
 !!****f* m_rdmft_integrals/rdmft_ints_compute
 !! NAME
 !!  rdmft_ints_compute
@@ -356,6 +401,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
 
 ! *************************************************************************
 
+ call rdmft_mem_report('ints: entry')
  call ints%free()
  comm_ = xmpi_world
  if (present(comm)) comm_ = comm
@@ -424,7 +470,9 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ints%kint = zero
  ints%bj = zero
  ints%bk = zero
+ call rdmft_mem_report('ints: after jint, kint')
 
+ call rdmft_mem_report('ints: before the J part')
  ABI_MALLOC(prod,(2,nfft))
  ABI_MALLOC(pgrid,(2,nfft))
  ABI_MALLOC(vc,(nfft))
@@ -532,6 +580,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  end if
  ABI_FREE(ui1)
  rdmft_tint(3) = rdmft_tint(3)+abi_wtime()-tph
+ call rdmft_mem_report('ints: after the J part')
  ! Background-background pairs: |sum_q rho_q|^2 contains the diagonal terms
  ints%sjo = sum(vc(:)*(rbg(1,:)**2+rbg(2,:)**2))/orbs%ucvol-ints%sjd
  ABI_FREE(rbg)
@@ -620,7 +669,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          wf = wantf
          if (wf) then
            wf = (req%rowmap(ib,ik) > 0 .and. req%colmap(iq) > 0)
-           if (wf) wf = (req%ccoef(req%rowmap(ib,ik),req%colmap(iq),ik) /= zero)
+           if (wf) wf = (req%ccoef(req%rowmap(ib,ik),req%colmap(iq)) /= zero)
          end if
          if (.not.(needk .or. wf)) cycle
          ! conjg(u_i) u_j
@@ -637,7 +686,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
            ! F_pj = 1/nfft sum_r u_p(r) W_j(r), W_j(r) = sum_q conjg(u_q(r)) b_jq(r), b_jq = inverse FFT of Y_jq
            ! (accumulated over k' and q, one ZGEMM per k-point at the end)
            tpk = abi_wtime()
-           fcy = -two*req%ccoef(req%rowmap(ib,ik),req%colmap(iq),ik)/orbs%ucvol
+           fcy = -two*req%ccoef(req%rowmap(ib,ik),req%colmap(iq))/orbs%ucvol
            yk(1,:) = fcy*vc(:)*pgrid(1,:)
            yk(2,:) = fcy*vc(:)*pgrid(2,:)
            call fourdp(2,yk,wrs,+1,mpi_enreg,nfft,1,ngfft,0)
@@ -684,6 +733,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    ABI_FREE(ui)
  end do
  rdmft_tint(4) = rdmft_tint(4)+abi_wtime()-tph
+ call rdmft_mem_report('ints: after the K sweep')
  tph = abi_wtime()
  if (nproc > 1) call xmpi_barrier(comm_)
  rdmft_tint(5) = rdmft_tint(5)+abi_wtime()-tph
@@ -696,6 +746,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    if (fused) call xmpi_sum(req%fx,comm_,ierr)
  end if
  rdmft_tint(6) = rdmft_tint(6)+abi_wtime()-tph
+ call rdmft_mem_report('ints: after the sums of the K results')
  ABI_FREE(uj1)
  ABI_FREE(trk)
  if (fused) then
