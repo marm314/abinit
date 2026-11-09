@@ -3340,6 +3340,8 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
 
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'prtden',tread,'INT')
  if(tread==1) dtset%prtden=intarr(1)
+ ! RDMFT: the DEN and WFK files of the natural orbitals are written only when requested
+ if(tread/=1 .and. dtset%optdriver==RUNL_RDMFT) dtset%prtden=0
 
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'prtdipole',tread,'INT')
  if(tread==1) dtset%prtdipole=intarr(1)
@@ -3488,6 +3490,8 @@ if (dtset%usekden==1) then
  if(tread==1) then
    dtset%prtwf=intarr(1)
  else if (dtset%tfkinfunc==2)then
+   dtset%prtwf=0
+ else if (dtset%optdriver==RUNL_RDMFT) then
    dtset%prtwf=0
  endif
 

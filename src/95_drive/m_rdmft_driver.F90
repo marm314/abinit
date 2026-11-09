@@ -32,6 +32,9 @@ module m_rdmft_driver
  use m_dtfil,             only : datafiles_type
  use m_dtset,             only : dataset_type
  use m_fstrings,          only : sjoin
+ use m_crystal,          only : crystal_t
+ use m_hdr,               only : hdr_type
+ use m_ioarr,             only : fftdatar_write
  use m_io_tools,          only : get_unit, open_file
  use m_nctk,              only : nctk_try_fort_or_ncfile
  use m_pawfgr,            only : pawfgr_type, pawfgr_init, pawfgr_destroy
@@ -487,6 +490,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
 
    call print_occupations()
    call print_final_energies()
+   if (dtset%prtwf > 0 .or. dtset%prtden > 0) call write_natural_orbitals()
    tst(7) = abi_wtime()-t_start
    call report_mem('end of the run')
    write(msg,'(a,7f9.2)') ' RDMFT: elapsed (s) after read WFK / completion+TR / orbital setup / integrals / first occupations'//&
@@ -1475,6 +1479,47 @@ contains
    write(msg,'(4a)') trim(ln(5))//ch10,trim(ln(6))//ch10,trim(ln(7))//ch10,trim(ln(8))
    call wrtout([ab_out,std_out],msg)
  end subroutine print_occupations
+
+ subroutine write_natural_orbitals()
+   ! WFK file (natural orbitals, occupations 2 n between 0 and 2, eigenvalues = diagonal of the one-electron Hamiltonian)
+   ! and DEN file (density of the natural orbitals) of the final state, written by the master as in the GW 1-RDM driver
+   integer :: jk,nb2
+   real(dp),allocatable :: eig_w(:,:),occ_w(:,:),rho_w(:,:)
+   type(hdr_type) :: hdr_w
+   type(crystal_t) :: cryst_w
+   ABI_MALLOC(eig_w,(orbs%mband,orbs%nkpt))
+   ABI_MALLOC(occ_w,(orbs%mband,orbs%nkpt))
+   eig_w = zero
+   occ_w = zero
+   do jk=1,orbs%nkpt
+     nb2 = orbs%nband(jk,1)
+     eig_w(1:nb2,jk) = h1c(offset(jk)+1:offset(jk)+nb2)
+     occ_w(1:nb2,jk) = two*nfull(offset(jk)+1:offset(jk)+nb2)
+   end do
+   ABI_MALLOC(rho_w,(nfftf,1))
+   if (dtset%prtden > 0) call compute_density(nfull,rho_w(:,1))
+   if (xmpi_comm_rank(xmpi_world) == master) then
+     call orbs%make_hdr(hdr_w,occ_w)
+     if (dtset%prtwf > 0) then
+       call orbs%write_wfk(dtfil%fnameabo_wfk,dtset%iomode,hdr_w,eig_w,occ_w)
+       write(msg,'(2a)') ch10,' RDMFT: natural orbitals written to '//trim(dtfil%fnameabo_wfk)//&
+         ' (occupations 2n; the eigenvalues are the diagonal elements of the one-electron Hamiltonian)'
+       call wrtout([ab_out,std_out],msg)
+     end if
+     if (dtset%prtden > 0) then
+       hdr_w%ngfft(1:3) = ngfftf(1:3)
+       cryst_w = hdr_w%get_crystal()
+       call fftdatar_write("density",dtfil%fnameabo_den,dtset%iomode,hdr_w,cryst_w,ngfftf,1,nfftf,1,rho_w,mpi_seq)
+       call cryst_w%free()
+       write(msg,'(2a)') ch10,' RDMFT: density of the natural orbitals written to '//trim(dtfil%fnameabo_den)
+       call wrtout([ab_out,std_out],msg)
+     end if
+     call hdr_w%free()
+   end if
+   ABI_FREE(eig_w)
+   ABI_FREE(occ_w)
+   ABI_FREE(rho_w)
+ end subroutine write_natural_orbitals
 
  function diag_sum() result(dsum)
    ! Sum over the occupied orbitals of K_pp - J_pp (free and background)

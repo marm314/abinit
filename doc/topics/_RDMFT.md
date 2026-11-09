@@ -192,6 +192,17 @@ total energy of the ground-state calculation (to about 1e-9 Ha, with [[rdmft_occ
 tests. The cost is greatly reduced by [[rdmft_occ_skip]], which drops the orbitals that are (almost) unoccupied from the
 sums of pair densities.
 
+## Output of the natural orbitals and of the density
+
+At the end of the run, [[prtwf]] = 1 writes a WFK file with the (optimized) natural orbitals and [[prtden]] = 1 writes a DEN
+file with their density. Both are 0 by default in the RDMFT runs (unlike in ground-state runs), so the files are only written
+when requested. The WFK file has the k-points of the calculation (completed by time reversal if the ground-state mesh was not
+closed under k -> -k), the bands of the calculation (all the plane waves with [[rdmft_complete]] = 1), the occupation
+numbers 2 n (between 0 and 2, as in the natural-orbital files of the GW 1-RDM) and, as eigenvalues, the diagonal elements of
+the one-electron Hamiltonian (kinetic, local and non-local pseudopotential; the natural orbitals are not eigenstates of any
+one-body operator). The files are named like those of the ground-state calculations (`<output>_WFK`, `<output>_DEN`) and can
+be used for visualization or as the starting point of another calculation.
+
 ## Degenerate states and the choice of the orbitals
 
 The energy of a functional with fractional occupations (MBB, CGA, MLSIC, GU, ...) at **fixed** orbitals is not invariant under
