@@ -19920,6 +19920,162 @@ Rotation angle $\theta$ (radians) of the central finite differences of [[rdmft_c
 ),
 
 Variable(
+    abivarname="rdmft_orb_macro",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: ORBital optimization, MACRO-iterations",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Maximum number of macro-iterations of the optimization of the orbitals in an RDMFT calculation ([[optdriver]] = 11).
+Each macro-iteration optimizes the occupation numbers for the current orbitals (see [[rdmft_functional]]), and then
+rotates the orbitals with the ADAM optimizer at fixed occupations, using the analytic orbital gradient (generalized Fock
+matrix). The rotations only mix states of the same k-point, with the conjugate matrix at $-\mathbf{k}$ (time-reversal
+symmetry is preserved, and the rotations at time-reversal-invariant k-points are real). The 0 default keeps the orbitals of the
+ground-state calculation. The macro-iterations stop when the energy changes by less than [[rdmft_orb_etol]].
+""",
+),
+
+Variable(
+    abivarname="rdmft_adam_iter",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=10,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM base ITERations",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Number of ADAM iterations of each orbital optimization run of [[rdmft_orb_macro]]. If a run does not lower the energy,
+the learning rate is multiplied by 0.2 and the number of iterations is increased by 20 (up to 200) in the next macro-iteration.
+""",
+),
+
+Variable(
+    abivarname="rdmft_adam_lr",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0.01,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM Learning Rate",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Initial learning rate of the ADAM optimizer of the orbitals ([[rdmft_orb_macro]]).
+""",
+),
+
+Variable(
+    abivarname="rdmft_orb_etol",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1.0e-9,
+    mnemonics="Reduced Density Matrix Functional Theory: ORBital optimization Energy TOLerance",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Energy change (Ha) below which the macro-iterations of [[rdmft_orb_macro]] are converged.
+""",
+),
+
+Variable(
+    abivarname="rdmft_orb_gtol",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1.0e-5,
+    mnemonics="Reduced Density Matrix Functional Theory: ORBital optimization Gradient TOLerance",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Largest modulus of the orbital gradient below which an ADAM run of [[rdmft_orb_macro]] is stopped.
+""",
+),
+
+Variable(
+    abivarname="rdmft_adam_incr",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=20,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM iteration INCReMent",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Number of ADAM iterations added to [[rdmft_adam_iter]] after an orbital optimization run that did not lower the energy (see [[rdmft_orb_macro]]).
+""",
+),
+
+Variable(
+    abivarname="rdmft_adam_maxit",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=200,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM MAXimum number of ITerations",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Largest number of ADAM iterations of one run of [[rdmft_orb_macro]]; beyond it the run goes back to [[rdmft_adam_iter]].
+""",
+),
+
+Variable(
+    abivarname="rdmft_adam_beta1",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0.7,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM BETA1",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Decay rate of the first moment (complex) of the orbital gradient in the ADAM optimizer ([[rdmft_orb_macro]]).
+""",
+),
+
+Variable(
+    abivarname="rdmft_adam_beta2",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0.9,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM BETA2",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Decay rate of the second moment (squared modulus) of the orbital gradient in the ADAM optimizer ([[rdmft_orb_macro]]).
+""",
+),
+
+Variable(
+    abivarname="rdmft_adam_rate",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0.2,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM learning RATE reduction factor",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Factor that multiplies the ADAM learning rate [[rdmft_adam_lr]] after a run that did not lower the energy.
+""",
+),
+
+Variable(
     abivarname="rdmft_core_ints",
     varset="dev",
     vartype="integer",

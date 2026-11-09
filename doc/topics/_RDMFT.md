@@ -143,6 +143,25 @@ part the pair densities of all the bands of the k-point with every orbital $q$ o
 only states of the same k-point are rotated. The gradient of the pair $(p,q)$ is $2\,\mathrm{Re}(F_{pq}-F_{qp}^*)$ in the
 real direction and $-2\,\mathrm{Im}(F_{pq}-F_{qp}^*)$ in the imaginary one.
 
+## Optimization of the orbitals (ADAM)
+
+With [[rdmft_orb_macro]] > 0 the orbitals are optimized too. Each macro-iteration rotates the orbitals at fixed occupations
+with the ADAM optimizer (never a Hessian) and then re-optimizes the occupations for the new orbitals, until the energy
+changes by less than [[rdmft_orb_etol]]. The orbitals are rotated with $\psi'_j=\sum_i\psi_i U_{ij}$, $U=\exp(\kappa)$,
+where $\kappa$ is anti-Hermitian and **block diagonal in k**: only states of the same k-point are mixed. Time reversal is
+preserved: the rotation at $-\mathbf{k}$ is the conjugate matrix, so only one of the two k-points is a set of independent
+parameters (and the rotations at time-reversal-invariant k-points are real). The parameters are the complex
+$\kappa_{pq}$ ($p<q$), and the gradient is the analytic one of the previous section.
+
+The ADAM optimizer is the complex version of the one of ReRDMFT: complex first moment (decay [[rdmft_adam_beta1]]), a real
+second moment of $|g|^2$ shared by the real and imaginary parts ([[rdmft_adam_beta2]]), bias corrections and the running
+maximum of the second moment. A run has [[rdmft_adam_iter]] iterations (learning rate [[rdmft_adam_lr]]) and stops earlier
+if the largest gradient is below [[rdmft_orb_gtol]] or the energy changes by less than [[rdmft_orb_etol]]. If a run does not
+lower the energy, it restarts from the best point with the learning rate multiplied by [[rdmft_adam_rate]] and
+[[rdmft_adam_incr]] more iterations (up to [[rdmft_adam_maxit]]). The rotations are limited to the bands of the WFK file:
+the minimum can only be reached if these bands span the orbitals of the optimum, so a large [[nband]] is needed. A good test
+is to start from PBE orbitals with the SD functional: the energy tends to the Hartree-Fock one as [[nband]] grows.
+
 ## Present limitations
 
 Norm-conserving pseudopotentials, closed shells ([[nsppol]] = 1, [[nspinor]] = 1), no band or k-point parallelization

@@ -137,6 +137,7 @@ module m_rdmft_orbitals
    ! Add the missing -k points, with the time-reversed orbitals.
 
    procedure :: rotate_pair => rdmft_orbs_rotate_pair
+   procedure :: rotate_k => rdmft_orbs_rotate_k
    ! Rotate two bands of one k-point.
 
    procedure :: tr_alignment => rdmft_orbs_tr_alignment
@@ -523,6 +524,63 @@ subroutine rdmft_orbs_rotate_pair(orbs,ik,ib,jb,umat)
  end do
 
 end subroutine rdmft_orbs_rotate_pair
+!!***
+
+!!****f* m_rdmft_orbitals/rdmft_orbs_rotate_k
+!! NAME
+!!  rdmft_orbs_rotate_k
+!!
+!! FUNCTION
+!!  Rotate all the bands of the k-point ik with the unitary matrix U: psi'_j = sum_i psi_i U_ij.
+!!  The rotation mixes only states of the same k-point, so the Bloch character is kept.
+!!
+!! INPUTS
+!!  ik = k-point
+!!  umat(nband,nband) = unitary matrix
+!!
+!! SOURCE
+subroutine rdmft_orbs_rotate_k(orbs,ik,umat)
+
+ !Arguments ------------------------------------
+ !scalars
+ class(rdmft_orbs_t),intent(inout) :: orbs
+ integer,intent(in) :: ik
+ !arrays
+ complex(dpc),intent(in) :: umat(:,:)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ib,ig,jb,nb,npwso
+ !arrays
+ complex(dpc),allocatable :: cold(:,:),cnew(:)
+
+! *************************************************************************
+
+ nb = orbs%nband(ik,1)
+ npwso = orbs%npw(ik)*orbs%nspinor
+ ABI_MALLOC(cold,(nb,npwso))
+ ABI_MALLOC(cnew,(nb))
+ do ib=1,nb
+   do ig=1,npwso
+     cold(ib,ig) = cmplx(orbs%cg(1,ig,ib,ik,1),orbs%cg(2,ig,ib,ik,1),kind=dpc)
+   end do
+ end do
+ do ig=1,npwso
+   do jb=1,nb
+     cnew(jb) = czero
+     do ib=1,nb
+       cnew(jb) = cnew(jb)+cold(ib,ig)*umat(ib,jb)
+     end do
+   end do
+   do jb=1,nb
+     orbs%cg(1,ig,jb,ik,1) = real(cnew(jb),dp)
+     orbs%cg(2,ig,jb,ik,1) = aimag(cnew(jb))
+   end do
+ end do
+ ABI_FREE(cold)
+ ABI_FREE(cnew)
+
+end subroutine rdmft_orbs_rotate_k
 !!***
 
 !!****f* m_rdmft_orbitals/rdmft_orbs_tr_alignment

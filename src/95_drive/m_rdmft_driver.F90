@@ -37,6 +37,7 @@ module m_rdmft_driver
  use m_pawfgr,            only : pawfgr_type, pawfgr_init, pawfgr_destroy
  use m_pawrad,            only : pawrad_type
  use m_pawtab,            only : pawtab_type
+ use m_rdmft_adam,        only : rdmft_adam_t, rdmft_expm
  use m_rdmft_fock,        only : rdmft_gen_fock_k
  use m_rdmft_functionals, only : RDMFT_SD, RDMFT_MULLER_AS, RDMFT_PNOF5, RDMFT_GNOF, rdmft_active_space, rdmft_bg_t, &
                                  rdmft_coef_jk, rdmft_coef_pnof, rdmft_energy_jk, rdmft_energy_pnof, rdmft_fermi_dirac, &
@@ -176,9 +177,9 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
                   gsqcutc_eff=gsqcutc_eff,gsqcutf_eff=gsqcutf_eff,gmet=orbs%gmet,k0=k0)
 
  !One-electron part: h_pp with getghc, Ewald and core energies
- if (dtset%rdmft_check_rot > 0) then
+ if (dtset%rdmft_check_rot > 0 .or. dtset%rdmft_orb_macro > 0) then
    if (.not.(is_jk .or. is_pnof)) then
-     ABI_ERROR('RDMFT: rdmft_check_rot needs rdmft_functional /= 0 (the occupations at which the gradient is checked).')
+     ABI_ERROR('RDMFT: rdmft_check_rot and rdmft_orb_macro need rdmft_functional /= 0 (the occupations to use).')
    end if
    if (dtset%rdmft_rot_k > orbs%nkpt) then
      ABI_ERROR('RDMFT: rdmft_rot_k is larger than the number of k-points.')
@@ -351,6 +352,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ntarget = orbs%nelect/two*orbs%nkpt-real(ints%nbg,dp)
    ABI_MALLOC(n0,(nf))
    ABI_MALLOC(nopt,(nf))
+   ABI_MALLOC(nfull,(nbk))
    n0 = nf_gs
    if (dtset%rdmft_start == 1) then
      if (is_pnof) then
@@ -365,14 +367,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    end if
    if (dtset%rdmft_restart == 1) call read_occ_file(nf,ints%comp_of,offset,orbs%nband(:,1),n0)
 
-   if (is_jk) then
-     call rdmft_optimize_jk(dtset%rdmft_functional,orbs%nkpt,nf,h1f,ints%jint,ints%kint,alpha,partf,n0,ntarget,eps_box,&
-                            ints%bj,ints%bk,bgt,nopt,eopt,conv,niter)
-   else
-     call rdmft_optimize_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,h1f,ints%jint,ints%kint,dtset%rdmft_selfint,&
-                              ints%bj,ints%bk,bgt,dtset%rdmft_restart == 1,n0,1.0e-8_dp,500,dtset%prtvol >= 10,&
-                              nopt,eopt,conv,niter)
-   end if
+   call optimize_occupations(n0,eopt,conv,niter)
    write(msg,'(2a,a,i0,a,l1,3a,es22.14,a,es22.14,a,es10.2,a)') ch10,' RDMFT: occupation numbers optimized for the ',&
      'functional ',dtset%rdmft_functional,' (converged = ',conv,')',ch10,&
      ' RDMFT: optimized total energy         = ',eopt+e_ewald+e_corepsp,&
@@ -381,14 +376,14 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    write(msg,'(a,i0,a,es14.6)') ' RDMFT: number of iterations = ',niter,'; sum of the occupations of the free orbitals = ',&
      sum(nopt)
    call wrtout([ab_out,std_out],msg)
+   call assemble_nfull()
 
-   ! Occupations of all the orbitals: background 1, free from the optimization, frozen virtual 0
-   ABI_MALLOC(nfull,(nbk))
-   nfull = zero
-   where (bg) nfull = one
-   do ip=1,nf
-     nfull(ints%comp_of(ip)) = nopt(ip)
-   end do
+   ! Optimization of the orbitals (ADAM) alternated with the one of the occupations
+   if (dtset%rdmft_orb_macro > 0) then
+     call orbital_macro(eopt+e_ewald+e_corepsp)
+     eopt = energy_rot(orbs,h1c)-e_ewald-e_corepsp
+   end if
+
    write(msg,'(a)') ' RDMFT: occupation numbers of the first k-point (band, energy, n):'
    call wrtout([ab_out,std_out],msg)
    do ib=1,orbs%nband(1,1)
@@ -427,6 +422,246 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  call orbs%free()
 
 contains
+
+ subroutine optimize_occupations(nstart,e_out,conv_out,nit_out)
+   ! Optimization of the occupations (nopt) for the current integrals and one-electron elements
+   real(dp),intent(in) :: nstart(:)
+   real(dp),intent(out) :: e_out
+   logical,intent(out) :: conv_out
+   integer,intent(out) :: nit_out
+   if (is_jk) then
+     call rdmft_optimize_jk(dtset%rdmft_functional,orbs%nkpt,nf,h1f,ints%jint,ints%kint,alpha,partf,nstart,ntarget,eps_box,&
+                            ints%bj,ints%bk,bgt,nopt,e_out,conv_out,nit_out)
+   else
+     call rdmft_optimize_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,h1f,ints%jint,ints%kint,dtset%rdmft_selfint,&
+                              ints%bj,ints%bk,bgt,dtset%rdmft_restart == 1,nstart,1.0e-8_dp,500,dtset%prtvol >= 10,&
+                              nopt,e_out,conv_out,nit_out)
+   end if
+ end subroutine optimize_occupations
+
+ subroutine assemble_nfull()
+   ! Occupations of all the orbitals: background 1, free from the optimization, frozen virtual 0
+   integer :: jf
+   nfull = zero
+   where (bg) nfull = one
+   do jf=1,nf
+     nfull(ints%comp_of(jf)) = nopt(jf)
+   end do
+ end subroutine assemble_nfull
+
+ subroutine refresh_ints()
+   ! Integrals and one-electron elements of the current (rotated) orbitals
+   integer :: jf
+   call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
+                     dtset%rdmft_core_ints == 1,quiet=.true.)
+   do jf=1,nf
+     h1f(jf) = h1c(ints%comp_of(jf))
+   end do
+   bgt%sh = sum(h1c,mask=bg)
+   bgt%sjo = ints%sjo; bgt%sko = ints%sko; bgt%sjd = ints%sjd; bgt%skd = ints%skd
+ end subroutine refresh_ints
+
+ subroutine apply_u(jk,umat)
+   ! Rotate the bands of the k-point jk with U, and the core Hamiltonian matrix: h' = U^dagger h U
+   integer,intent(in) :: jk
+   complex(dpc),intent(in) :: umat(:,:)
+   integer :: jb2,nb2
+   nb2 = orbs%nband(jk,1)
+   call orbs%rotate_k(jk,umat)
+   hmat(1:nb2,1:nb2,jk) = matmul(conjg(transpose(umat)),matmul(hmat(1:nb2,1:nb2,jk),umat))
+   do jb2=1,nb2
+     h1c(offset(jk)+jb2) = real(hmat(jb2,jb2,jk),dp)
+   end do
+ end subroutine apply_u
+
+ subroutine rotate_all(kpar,dx)
+   ! Rotation of all the k-points with the ADAM step dx: kappa_pq = dx (p<q), kappa_qp = -conjg(kappa_pq), U = exp(kappa);
+   ! the time-reversed k-point -k gets the conjugate matrix
+   integer,intent(in) :: kpar(:)
+   complex(dpc),intent(in) :: dx(:)
+   integer :: jk,kk,ipar,pp,qq,nb2
+   complex(dpc),allocatable :: kap(:,:),um(:,:)
+   do jk=1,orbs%nkpt
+     if (kpar(jk) < 0) cycle
+     nb2 = orbs%nband(jk,1)
+     ABI_MALLOC(kap,(nb2,nb2))
+     ABI_MALLOC(um,(nb2,nb2))
+     kap = czero
+     ipar = kpar(jk)
+     do pp=1,nb2
+       do qq=pp+1,nb2
+         ipar = ipar+1
+         kap(pp,qq) = dx(ipar)
+         if (orbs%tr_k(jk) == jk) kap(pp,qq) = cmplx(real(dx(ipar),dp),zero,kind=dpc)
+         kap(qq,pp) = -conjg(kap(pp,qq))
+       end do
+     end do
+     um = rdmft_expm(kap)
+     call apply_u(jk,um)
+     kk = orbs%tr_k(jk)
+     if (kk > 0 .and. kk /= jk) call apply_u(kk,conjg(um))
+     ABI_FREE(kap)
+     ABI_FREE(um)
+   end do
+ end subroutine rotate_all
+
+ subroutine orbital_gradient(kpar,grad,gmax)
+   ! Complex orbital gradient (dE/dRe kappa_pq + i dE/dIm kappa_pq, p<q) of the independent k-points; the time-reversed
+   ! k-point gives the same contribution, and the rotations at the time-reversal-invariant k-points are real
+   integer,intent(in) :: kpar(:)
+   complex(dpc),intent(out) :: grad(:)
+   real(dp),intent(out) :: gmax
+   integer :: jk,ipar,pp,qq,nb2
+   real(dp) :: fac
+   complex(dpc) :: dg
+   complex(dpc),allocatable :: fk(:,:)
+   grad = czero
+   do jk=1,orbs%nkpt
+     if (kpar(jk) < 0) cycle
+     nb2 = orbs%nband(jk,1)
+     ABI_MALLOC(fk,(nb2,nb2))
+     call build_fock(jk,fk)
+     fac = one
+     if (orbs%tr_k(jk) > 0 .and. orbs%tr_k(jk) /= jk) fac = two
+     ipar = kpar(jk)
+     do pp=1,nb2
+       do qq=pp+1,nb2
+         ipar = ipar+1
+         dg = fk(pp,qq)-conjg(fk(qq,pp))
+         grad(ipar) = fac*cmplx(two*real(dg,dp),-two*aimag(dg),kind=dpc)
+         if (orbs%tr_k(jk) == jk) grad(ipar) = cmplx(real(grad(ipar),dp),zero,kind=dpc)
+       end do
+     end do
+     ABI_FREE(fk)
+   end do
+   gmax = zero
+   if (size(grad) > 0) gmax = maxval(abs(grad))
+ end subroutine orbital_gradient
+
+ subroutine orbital_macro(e_start)
+   ! Macro-iterations: ADAM rotation of the orbitals at fixed occupations, then optimization of the occupations
+   real(dp),intent(in) :: e_start
+   integer :: imac,icall,icall_max,extra,jk,npar,nstall,nit2,mi
+   integer,allocatable :: kpar(:)
+   real(dp) :: e_old,e_new,e_prev,e_best,e_run0,lr,gmax,de
+   logical :: gconv,improved,restart,conv2
+   complex(dpc),allocatable :: grad(:),dx(:)
+   complex(dpc),allocatable :: hmat_b(:,:,:)
+   real(dp),allocatable :: h1c_b(:)
+   type(rdmft_adam_t) :: adam
+   type(rdmft_orbs_t) :: orbs_b
+
+   ABI_MALLOC(kpar,(orbs%nkpt))
+   npar = 0
+   do jk=1,orbs%nkpt
+     ! independent k-points: -k is represented by k (time reversal)
+     if (orbs%tr_k(jk) > 0 .and. orbs%tr_k(jk) < jk) then
+       kpar(jk) = -1
+     else
+       kpar(jk) = npar
+       npar = npar+orbs%nband(jk,1)*(orbs%nband(jk,1)-1)/2
+     end if
+   end do
+   ABI_MALLOC(grad,(npar))
+   ABI_MALLOC(dx,(npar))
+   ABI_MALLOC(h1c_b,(nbk))
+   ABI_MALLOC(hmat_b,(size(hmat,1),size(hmat,2),size(hmat,3)))
+   call adam%init(npar,dtset%rdmft_adam_beta1,dtset%rdmft_adam_beta2)
+   write(msg,'(2a,i0,a,es9.2,a,es9.2,a,es9.2,a)') ch10,' RDMFT: ADAM optimization of the orbitals (',npar,&
+     ' complex rotation parameters); energy tolerance ',dtset%rdmft_orb_etol,', gradient tolerance ',dtset%rdmft_orb_gtol,&
+     ', learning rate ',dtset%rdmft_adam_lr,ch10
+   call wrtout([ab_out,std_out],msg)
+   lr = dtset%rdmft_adam_lr
+   extra = 0
+   e_old = e_start
+   nstall = 0
+   mi = 0
+   do imac=1,dtset%rdmft_orb_macro
+     icall_max = dtset%rdmft_adam_iter+extra
+     if (icall_max > dtset%rdmft_adam_maxit) then
+       icall_max = dtset%rdmft_adam_iter
+       extra = 0
+     end if
+     call adam%clean()
+     e_run0 = energy_rot(orbs,h1c)
+     e_best = e_run0
+     e_prev = e_run0
+     orbs_b = orbs
+     h1c_b = h1c
+     hmat_b = hmat
+     gconv = .false.
+     improved = .false.
+     de = zero
+     gmax = zero
+     do icall=1,icall_max
+       call orbital_gradient(kpar,grad,gmax)
+       if (gmax < dtset%rdmft_orb_gtol) then
+         gconv = .true.
+         exit
+       end if
+       call adam%step(grad,lr,dx)
+       call rotate_all(kpar,dx)
+       e_new = energy_rot(orbs,h1c)
+       if (dtset%prtvol >= 10) then
+         write(msg,'(a,i4,a,es22.14,a,es10.2,a,es10.2)') '   ADAM ',icall,'  E = ',e_new,'  dE = ',e_new-e_prev,&
+           '  max|g| = ',gmax
+         call wrtout(std_out,msg)
+       end if
+       if (e_new < e_best-tol14) then
+         e_best = e_new
+         improved = .true.
+         orbs_b = orbs
+         h1c_b = h1c
+         hmat_b = hmat
+       end if
+       de = e_new-e_prev
+       e_prev = e_new
+       if (icall > 1 .and. abs(de) < dtset%rdmft_orb_etol) exit
+     end do
+     ! No improvement although the energy still moves: restart from the best point with a smaller learning rate
+     restart = (.not.improved .and. .not.gconv .and. abs(de) > dtset%rdmft_orb_etol)
+     if (restart) then
+       lr = lr*dtset%rdmft_adam_rate
+       extra = extra+dtset%rdmft_adam_incr
+     else if (gconv) then
+       lr = dtset%rdmft_adam_lr
+       extra = 0
+     end if
+     orbs = orbs_b
+     h1c = h1c_b
+     hmat = hmat_b
+     ! Occupations for the new orbitals
+     call refresh_ints()
+     call optimize_occupations(nopt,e_new,conv2,nit2)
+     call assemble_nfull()
+     e_new = e_new+e_ewald+e_corepsp
+     write(msg,'(a,i4,a,f14.8,a,es10.2,a,es10.2,5a)') ' RDMFT: macro-iteration ',imac,'  E = ',e_new,&
+       '  dE = ',e_new-e_old,'  max|g| = ',gmax,' (',merge('gradient converged','ADAM ran          ',gconv),&
+       merge(', restart requested','                   ',restart),')',ch10
+     call wrtout([ab_out,std_out],msg)
+     nstall = merge(nstall+1,0,abs(e_new-e_old) < dtset%rdmft_orb_etol)
+     mi = imac
+     if (abs(e_new-e_old) < dtset%rdmft_orb_etol .and. (.not.restart .or. gconv)) then
+       e_old = e_new
+       exit
+     end if
+     if (nstall >= 10) then
+       e_old = e_new
+       exit
+     end if
+     e_old = e_new
+   end do
+   write(msg,'(a,i0,a,es22.14,a)') ' RDMFT: orbital optimization finished after ',mi,' macro-iterations, E = ',e_old,ch10
+   call wrtout([ab_out,std_out],msg)
+   call adam%free()
+   call orbs_b%free()
+   ABI_FREE(kpar)
+   ABI_FREE(grad)
+   ABI_FREE(dx)
+   ABI_FREE(h1c_b)
+   ABI_FREE(hmat_b)
+ end subroutine orbital_macro
+
 
  function diag_sum() result(dsum)
    ! Sum over the occupied orbitals of K_pp - J_pp (free and background)

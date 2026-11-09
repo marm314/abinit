@@ -2294,6 +2294,36 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_restart',tread,'INT')
  if(tread==1) dtset%rdmft_restart=intarr(1)
 
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_orb_macro',tread,'INT')
+ if(tread==1) dtset%rdmft_orb_macro=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_iter',tread,'INT')
+ if(tread==1) dtset%rdmft_adam_iter=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_lr',tread,'DPR')
+ if(tread==1) dtset%rdmft_adam_lr=dprarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_orb_etol',tread,'DPR')
+ if(tread==1) dtset%rdmft_orb_etol=dprarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_orb_gtol',tread,'DPR')
+ if(tread==1) dtset%rdmft_orb_gtol=dprarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_incr',tread,'INT')
+ if(tread==1) dtset%rdmft_adam_incr=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_maxit',tread,'INT')
+ if(tread==1) dtset%rdmft_adam_maxit=intarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_beta1',tread,'DPR')
+ if(tread==1) dtset%rdmft_adam_beta1=dprarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_beta2',tread,'DPR')
+ if(tread==1) dtset%rdmft_adam_beta2=dprarr(1)
+
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_rate',tread,'DPR')
+ if(tread==1) dtset%rdmft_adam_rate=dprarr(1)
+
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_start',tread,'INT')
  if(tread==1) dtset%rdmft_start=intarr(1)
 

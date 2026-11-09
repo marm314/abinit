@@ -665,7 +665,11 @@ type, public :: dataset_type
  integer :: rdmft_core_ints
  integer :: rdmft_functional
  integer :: rdmft_ncoupl
+ integer :: rdmft_adam_incr
+ integer :: rdmft_adam_iter
+ integer :: rdmft_adam_maxit
  integer :: rdmft_nocc_act
+ integer :: rdmft_orb_macro
  integer :: rdmft_nvir_act
  integer :: rdmft_restart
  integer :: rdmft_rot_k
@@ -1008,7 +1012,13 @@ type, public :: dataset_type
  real(dp) :: ratsm
  real(dp) :: ratsph_extra
  real(dp) :: rcpaw_tolnc = tol30
+ real(dp) :: rdmft_adam_beta1
+ real(dp) :: rdmft_adam_beta2
+ real(dp) :: rdmft_adam_lr
+ real(dp) :: rdmft_adam_rate
  real(dp) :: rdmft_ecut_act
+ real(dp) :: rdmft_orb_etol
+ real(dp) :: rdmft_orb_gtol
  real(dp) :: rdmft_power
  real(dp) :: rdmft_rot_step
  real(dp) :: recrcut
@@ -2290,6 +2300,16 @@ type(dataset_type) function dtset_copy(dtin) result(dtout)
  dtout%rdmft_rot_p          = dtin%rdmft_rot_p
  dtout%rdmft_rot_q          = dtin%rdmft_rot_q
  dtout%rdmft_rot_step       = dtin%rdmft_rot_step
+ dtout%rdmft_orb_macro = dtin%rdmft_orb_macro
+ dtout%rdmft_adam_iter = dtin%rdmft_adam_iter
+ dtout%rdmft_adam_lr = dtin%rdmft_adam_lr
+ dtout%rdmft_orb_etol = dtin%rdmft_orb_etol
+ dtout%rdmft_orb_gtol = dtin%rdmft_orb_gtol
+ dtout%rdmft_adam_incr = dtin%rdmft_adam_incr
+ dtout%rdmft_adam_maxit = dtin%rdmft_adam_maxit
+ dtout%rdmft_adam_beta1 = dtin%rdmft_adam_beta1
+ dtout%rdmft_adam_beta2 = dtin%rdmft_adam_beta2
+ dtout%rdmft_adam_rate = dtin%rdmft_adam_rate
  dtout%rdmft_selfint        = dtin%rdmft_selfint
  dtout%rdmft_start          = dtin%rdmft_start
  dtout%recgratio          = dtin%recgratio
@@ -4043,6 +4063,7 @@ subroutine chkvars(string)
  list_vars=trim(list_vars)//' rdmft_check_rot rdmft_core_ints rdmft_ecut_act rdmft_functional rdmft_ncoupl rdmft_nocc_act rdmft_nvir_act'
  list_vars=trim(list_vars)//' rdmft_power rdmft_restart rdmft_rot_k rdmft_rot_p rdmft_rot_q rdmft_rot_step'
  list_vars=trim(list_vars)//' rdmft_selfint rdmft_start'
+ list_vars=trim(list_vars)//' rdmft_adam_beta1 rdmft_adam_beta2 rdmft_adam_incr rdmft_adam_maxit rdmft_adam_rate rdmft_adam_iter rdmft_adam_lr rdmft_orb_etol rdmft_orb_gtol rdmft_orb_macro'
  list_vars=trim(list_vars)//' red_dfield red_efield red_efieldbar restartxf'
  list_vars=trim(list_vars)//' rfatpol rfddk rfdir rfelfd rfeta rfmagn rfmeth rfomega rfphon'
  list_vars=trim(list_vars)//' rfstrs rfstrs_ref rf2_dkdk rf2_dkde rf2_pert1_dir rf2_pert2_dir rhoqpmix rifcsph rprim'

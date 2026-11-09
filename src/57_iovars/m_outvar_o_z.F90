@@ -898,6 +898,36 @@ contains
  intarr(1,:)=dtsets(:)%rdmft_restart
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_restart','INT',0)
 
+ intarr(1,:)=dtsets(:)%rdmft_orb_macro
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_orb_macro','INT',0)
+
+ intarr(1,:)=dtsets(:)%rdmft_adam_iter
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_iter','INT',0)
+
+ dprarr(1,:)=dtsets(:)%rdmft_adam_lr
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_lr','DPR',0)
+
+ dprarr(1,:)=dtsets(:)%rdmft_orb_etol
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_orb_etol','DPR',0)
+
+ dprarr(1,:)=dtsets(:)%rdmft_orb_gtol
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_orb_gtol','DPR',0)
+
+ intarr(1,:)=dtsets(:)%rdmft_adam_incr
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_incr','INT',0)
+
+ intarr(1,:)=dtsets(:)%rdmft_adam_maxit
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_maxit','INT',0)
+
+ dprarr(1,:)=dtsets(:)%rdmft_adam_beta1
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_beta1','DPR',0)
+
+ dprarr(1,:)=dtsets(:)%rdmft_adam_beta2
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_beta2','DPR',0)
+
+ dprarr(1,:)=dtsets(:)%rdmft_adam_rate
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_rate','DPR',0)
+
  intarr(1,:)=dtsets(:)%rdmft_start
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_start','INT',0)
 

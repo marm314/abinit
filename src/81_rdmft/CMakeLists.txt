@@ -2,6 +2,7 @@
 # 81_rdmft
 #
 add_library(81_rdmft STATIC
+  m_rdmft_adam.F90
   m_rdmft_fock.F90
   m_rdmft_functionals.F90
   m_rdmft_hamiltonian.F90
