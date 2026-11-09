@@ -65,7 +65,7 @@ module m_rdmft_integrals
  !> 3 J products and sum, 4 K pair sweep, 5 wait at the end of the K sweep (load imbalance), 6 sum of the K results
  real(dp),save :: rdmft_tint(6) = 0.0_dp
  !> Profile of the K sweep: 1 orbitals to real space (k), 2 orbital to real space (k'), 3 product of the orbitals,
- !> 4 FFT of the pair density, 5 K value and storage, 6 Fock products (ZGEMM), 7 number of pair densities (FFTs)
+ !> 4 FFT of the pair density, 5 K value and storage, 6 Fock part (inverse FFT, accumulation, ZGEMM), 7 number of pair densities (FFTs)
  real(dp),save :: rdmft_tprof(7) = 0.0_dp
 
  !> Request of the exchange part of the generalized Fock matrices, built in the loop of the K integrals
@@ -336,8 +336,9 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  integer :: ipb,iqb,pk
  integer,allocatable :: trk(:)
  real(dp) :: wgt
- complex(dpc),allocatable :: yy(:,:,:)
- real(dp),allocatable :: mall(:,:,:)
+ real(dp),allocatable :: wacc(:,:,:),yk(:,:),wrs(:,:)
+ logical :: wf
+ real(dp) :: fcy
  real(dp) :: kval
  logical :: fp,fq,bp,bq
  character(len=500) :: msg
@@ -513,8 +514,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ! ------------------------------------------------------------------
  fused = present(req)
  if (fused) then
-   ABI_MALLOC(mall,(2,nfft,maxval(orbs%nband(:,1))))
-   ABI_MALLOC(yy,(nfft,maxval(orbs%nband(:,1)),1))
+   ABI_MALLOC(yk,(2,nfft))
+   ABI_MALLOC(wrs,(2,nfft))
    if (allocated(req%fx)) then
      req%fx = czero
    end if
@@ -528,6 +529,10 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
    wantf = .false.
    if (fused) wantf = req%want(ik)
    ABI_MALLOC(ui,(2,nfft,nb))
+   if (wantf) then
+     ABI_MALLOC(wacc,(2,nfft,nb))
+     wacc = zero
+   end if
    tpk = abi_wtime()
    call orbs_to_real(orbs,ik,ngfft,mpi_enreg,ui)
    rdmft_tprof(1) = rdmft_tprof(1)+abi_wtime()-tpk
@@ -580,7 +585,10 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
            if (bp .and. bq .and. .not.core_ints) needk = .false.
          end if
          if (present(rel) .and. needk) needk = rel(ip)
-         if (.not.(needk .or. wantf)) cycle
+         ! Exchange part of the Fock matrix of this pair: only if the coupling is not zero
+         wf = wantf
+         if (wf) wf = (req%ccoef(ib,iq,ik) /= zero)
+         if (.not.(needk .or. wf)) cycle
          ! conjg(u_i) u_j
          tpk = abi_wtime()
          prod(1,:) = ui(1,:,ib)*uj1(1,:)+ui(2,:,ib)*uj1(2,:)
@@ -588,9 +596,21 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          rdmft_tprof(3) = rdmft_tprof(3)+abi_wtime()-tpk
          tpk = abi_wtime()
          call fourdp(2,pgrid,prod,-1,mpi_enreg,nfft,1,ngfft,0)
-         if (wantf) mall(:,:,ib) = pgrid
          rdmft_tprof(4) = rdmft_tprof(4)+abi_wtime()-tpk
          rdmft_tprof(7) = rdmft_tprof(7)+one
+         if (wf) then
+           ! F_pj += sum_G conjg(M_pq) Y_jq with Y_jq = -2 c_jq/Omega v M_jq. By Parseval (full FFT mesh):
+           ! F_pj = 1/nfft sum_r u_p(r) W_j(r), W_j(r) = sum_q conjg(u_q(r)) b_jq(r), b_jq = inverse FFT of Y_jq
+           ! (accumulated over k' and q, one ZGEMM per k-point at the end)
+           tpk = abi_wtime()
+           fcy = -two*req%ccoef(ib,iq,ik)/orbs%ucvol
+           yk(1,:) = fcy*vc(:)*pgrid(1,:)
+           yk(2,:) = fcy*vc(:)*pgrid(2,:)
+           call fourdp(2,yk,wrs,+1,mpi_enreg,nfft,1,ngfft,0)
+           wacc(1,:,ib) = wacc(1,:,ib)+uj1(1,:)*wrs(1,:)+uj1(2,:)*wrs(2,:)
+           wacc(2,:,ib) = wacc(2,:,ib)+uj1(1,:)*wrs(2,:)-uj1(2,:)*wrs(1,:)
+           rdmft_tprof(6) = rdmft_tprof(6)+abi_wtime()-tpk
+         end if
          if (.not.needk) cycle
          tpk = abi_wtime()
          kval = sum(vc(:)*(pgrid(1,:)**2+pgrid(2,:)**2))/orbs%ucvol
@@ -618,18 +638,15 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          end if
          rdmft_tprof(5) = rdmft_tprof(5)+abi_wtime()-tpk
        end do
-       if (wantf) then
-         tpk = abi_wtime()
-         ! F_pj += sum_G conjg(M_p) Y_j,  Y_j = -2 c_jq / Omega v M_j
-         do ib=1,nb
-           yy(:,ib,1) = cmplx(-two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(1,:,ib), &
-                              -two*req%ccoef(ib,iq,ik)/orbs%ucvol*vc(:)*mall(2,:,ib),kind=dpc)
-         end do
-         call zgemm('C','N',nb,nb,nfft,cone,mall,nfft,yy,nfft,cone,req%fx(1,1,ik),size(req%fx,1))
-         rdmft_tprof(6) = rdmft_tprof(6)+abi_wtime()-tpk
-       end if
      end do
    end do
+   if (wantf) then
+     tpk = abi_wtime()
+     call zgemm('T','N',nb,nb,nfft,cmplx(one/real(nfft,dp),zero,kind=dpc),ui,nfft,wacc,nfft,cone,req%fx(1,1,ik),&
+                size(req%fx,1))
+     rdmft_tprof(6) = rdmft_tprof(6)+abi_wtime()-tpk
+     ABI_FREE(wacc)
+   end if
    ABI_FREE(ui)
  end do
  rdmft_tint(4) = rdmft_tint(4)+abi_wtime()-tph
@@ -648,8 +665,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ABI_FREE(uj1)
  ABI_FREE(trk)
  if (fused) then
-   ABI_FREE(mall)
-   ABI_FREE(yy)
+   ABI_FREE(yk)
+   ABI_FREE(wrs)
  end if
 
  ABI_FREE(prod)
