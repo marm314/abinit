@@ -20135,6 +20135,8 @@ so this means occupations below the threshold; for the functionals with square r
 (MBB, ...) the couplings of a nearly empty orbital are much larger than its occupation and the orbital is kept.
 The energies printed during the ADAM iterations neglect the dropped terms; the energies printed after the
 re-optimization of the occupations (and the final one) include all the pairs. A value of 0 keeps everything.
+The orbitals are optimized for the energy without the dropped terms: the resulting error of the final energy is smaller
+than the neglected terms, which are of the order of (number of dropped orbitals) $\times$ **rdmft_occ_skip** $\times$ (a typical exchange integral, $\sim$ 0.05 Ha); with the default of 1e-6 this is below 1e-4 Ha (0.06 kcal/mol) even for a thousand dropped orbitals. For comparisons at the 1e-8 Ha level use a smaller value (1e-8) or 0. For the single-determinant functional with a very small [[rdmft_occ_min]] the dropped couplings are of the order of [[rdmft_occ_min]], and the energy is unchanged (to 1e-13 Ha in the tests) while the cost of the pair sums is divided by the ratio between the number of orbitals and the number of occupied ones.
 """,
 ),
 

@@ -192,6 +192,19 @@ total energy of the ground-state calculation (to about 1e-9 Ha, with [[rdmft_occ
 tests. The cost is greatly reduced by [[rdmft_occ_skip]], which drops the orbitals that are (almost) unoccupied from the
 sums of pair densities.
 
+## Degenerate states and the choice of the orbitals
+
+The energy of a functional with fractional occupations (MBB, CGA, MLSIC, GU, ...) at **fixed** orbitals is not invariant under
+unitary rotations of degenerate orbitals that have different occupations: the Coulomb and exchange integrals of the rotated
+orbitals are different. At time-reversal-invariant k-points and along symmetry lines the Kohn-Sham or Hartree-Fock orbitals are
+degenerate, and the basis returned by the diagonalization within a degenerate shell is arbitrary (it depends on the solver and on
+the starting vectors). The fixed-orbital energies of these functionals then depend on that arbitrary choice: in N2 two ground
+states that only differ by the eigensolver gave MBB and CGA energies that differ by 5e-5 Ha, while the single-determinant
+functional (invariant under such rotations) and the PNOF with one active occupied band do not change. This also applies to the
+bands that are read in a degenerate shell at the time-reversal-invariant points, which are replaced by real orbitals (needed
+for the real rotations at those points). The dependence disappears when the orbitals are optimized ([[rdmft_orb_macro]] > 0), and it is
+absent for non-degenerate states. When comparing fixed-orbital energies of such functionals, use the same ground-state run.
+
 ## Present limitations
 
 Norm-conserving pseudopotentials, closed shells ([[nsppol]] = 1, [[nspinor]] = 1), no band or k-point parallelization

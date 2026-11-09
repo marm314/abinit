@@ -122,6 +122,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  complex(dpc),allocatable :: hmat(:,:,:)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
  real(dp) :: tm(6),t0
+ integer :: nrel_last
 
 ! *************************************************************************
 
@@ -660,6 +661,7 @@ contains
        if (.not.relev(ib2)) req%ccoef(1:nb2,ib2,jk) = zero
      end do
    end do
+   nrel_last = count(relev)
    t0 = abi_wtime()
    call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
                      dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,req=req,rel=relev,&
@@ -777,8 +779,8 @@ contains
      ! energy and gradient at the start of the run (new occupations)
      call eval_point(kpar,e_best,grad,gmax)
      e_prev = e_best
-     write(msg,'(a,i0,a,i0,a,es9.2,a)') ch10//' ADAM orbital rotations, macro-iteration ',imac,' (at most ',icall_max,&
-       ' iterations, learning rate ',lr,'):'
+     write(msg,'(a,i0,a,i0,a,es9.2,a,i0,a,i0,a)') ch10//' ADAM orbital rotations, macro-iteration ',imac,' (at most ',&
+       icall_max,' iterations, learning rate ',lr,'); orbitals kept in the pair sums: ',nrel_last,' of ',nbk,' (rdmft_occ_skip)'
      call wrtout([ab_out,std_out],msg)
      write(msg,'(a)') '  ORB  macro  iter        Etotal(Ha)      deltaE(Ha)    max|g|'
      call wrtout([ab_out,std_out],msg)
