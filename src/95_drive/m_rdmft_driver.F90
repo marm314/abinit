@@ -45,7 +45,7 @@ module m_rdmft_driver
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_fock,        only : rdmft_fock_hartree_k
  use m_mpinfo,            only : destroy_mpi_enreg, initmpi_seq
- use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t, rdmft_tint
+ use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t, rdmft_tint, rdmft_tprof
  use m_rdmft_optimizer,   only : rdmft_grad_jk, rdmft_optimize_jk, rdmft_optimize_pnof
  use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
  use m_specialmsg,        only : wrtout
@@ -134,6 +134,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  alpha = dtset%rdmft_power
  tm = zero
  rdmft_tint = zero
+ rdmft_tprof = zero
  t_start = abi_wtime()
  tst = zero
  is_jk = (dtset%rdmft_functional >= RDMFT_SD .and. dtset%rdmft_functional <= RDMFT_MULLER_AS)
@@ -1319,6 +1320,9 @@ contains
    write(msg,'(a,6f10.2)') '   ints: dens, sumdens, J, Ksweep, Kwait, Ksum (max) =',tint_max
    call wrtout([ab_out,std_out],msg)
    write(msg,'(a,6f10.2)') '   ints: dens, sumdens, J, Ksweep, Kwait, Ksum (min) =',tint_min
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,5f10.2,f10.2,es11.3)') '   K sweep profile, rank 0: toreal(k), toreal(k2), product, FFT, K value, Fock ZGEMM, n_FFT = ',&
+     rdmft_tprof(1:6),rdmft_tprof(7)
    call wrtout([ab_out,std_out],msg)
    if (dtset%rdmft_occ_skip > zero) call spot_check(kpar)
    if (dtset%prtvol >= 10) call check_h()
