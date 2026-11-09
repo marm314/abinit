@@ -1486,6 +1486,7 @@ subroutine chkinp(dtsets, iout, mpi_enregs, ndtset, ndtset_alloc, npsp, pspheads
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_adam_lr',dt%rdmft_adam_lr,1,zero,iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_orb_etol',dt%rdmft_orb_etol,1,zero,iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_orb_gtol',dt%rdmft_orb_gtol,1,zero,iout)
+   call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_chkpt_freq',dt%rdmft_chkpt_freq,0,iout)
    call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_complete',dt%rdmft_complete,2,[0,1],iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_occ_skip',dt%rdmft_occ_skip,1,zero,iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_occ_min',dt%rdmft_occ_min,1,zero,iout)

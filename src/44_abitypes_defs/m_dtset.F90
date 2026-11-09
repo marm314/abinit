@@ -663,6 +663,7 @@ type, public :: dataset_type
  integer :: ratopt
  integer :: rdmft_check_rot
  integer :: rdmft_complete
+ integer :: rdmft_chkpt_freq
  integer :: rdmft_core_ints
  integer :: rdmft_functional
  integer :: rdmft_ncoupl
@@ -2317,6 +2318,7 @@ type(dataset_type) function dtset_copy(dtin) result(dtout)
  dtout%rdmft_adam_betav = dtin%rdmft_adam_betav
  dtout%rdmft_adam_rate = dtin%rdmft_adam_rate
  dtout%rdmft_complete = dtin%rdmft_complete
+ dtout%rdmft_chkpt_freq = dtin%rdmft_chkpt_freq
  dtout%rdmft_occ_min = dtin%rdmft_occ_min
  dtout%rdmft_occ_skip = dtin%rdmft_occ_skip
  dtout%rdmft_selfint        = dtin%rdmft_selfint
@@ -4073,7 +4075,7 @@ subroutine chkvars(string)
  list_vars=trim(list_vars)//' rdmft_check_rot rdmft_core_ints rdmft_ecut_act rdmft_functional rdmft_ncoupl rdmft_nocc_act rdmft_nvir_act'
  list_vars=trim(list_vars)//' rdmft_power rdmft_restart rdmft_restart_filepath rdmft_rot_k rdmft_rot_p rdmft_rot_q rdmft_rot_step'
  list_vars=trim(list_vars)//' rdmft_selfint rdmft_start'
- list_vars=trim(list_vars)//' rdmft_tr_reduce rdmft_occ_min rdmft_occ_skip rdmft_complete rdmft_adam_betam rdmft_adam_betav rdmft_adam_incr rdmft_adam_maxit rdmft_adam_rate rdmft_adam_iter rdmft_adam_lr rdmft_orb_etol rdmft_orb_gtol rdmft_orb_macro'
+ list_vars=trim(list_vars)//' rdmft_chkpt_freq rdmft_tr_reduce rdmft_occ_min rdmft_occ_skip rdmft_complete rdmft_adam_betam rdmft_adam_betav rdmft_adam_incr rdmft_adam_maxit rdmft_adam_rate rdmft_adam_iter rdmft_adam_lr rdmft_orb_etol rdmft_orb_gtol rdmft_orb_macro'
  list_vars=trim(list_vars)//' red_dfield red_efield red_efieldbar restartxf'
  list_vars=trim(list_vars)//' rfatpol rfddk rfdir rfelfd rfeta rfmagn rfmeth rfomega rfphon'
  list_vars=trim(list_vars)//' rfstrs rfstrs_ref rf2_dkdk rf2_dkde rf2_pert1_dir rf2_pert2_dir rhoqpmix rifcsph rprim'

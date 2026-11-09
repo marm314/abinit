@@ -1398,10 +1398,12 @@ contains
      if (.not.conv2) stat = trim(stat)//'; occupations not converged'
      write(msg,'(a,i6,f20.12,es16.3,es10.2,2i10,2a)') '  MACRO',imac,e_new,e_new-e_old,gmax,nadam,nit2,'  ',trim(stat)
      call wrtout([ab_out,std_out],msg)
-     if (dtset%prtwf > 0) then
+     if (dtset%prtwf > 0 .and. dtset%rdmft_chkpt_freq > 0) then
+      if (mod(imac,dtset%rdmft_chkpt_freq) == 0) then
        rst_lr1 = lr
        rst_conv = conv2
        call write_checkpoint(e_new)
+      end if
      end if
      nstall = merge(nstall+1,0,abs(e_new-e_old) < dtset%rdmft_orb_etol)
      mi = imac

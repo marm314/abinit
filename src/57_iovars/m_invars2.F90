@@ -2327,6 +2327,9 @@ subroutine invars2(bravais,dtset,iout,jdtset,lenstr,mband,msym,npsp,string,usepa
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_adam_rate',tread,'DPR')
  if(tread==1) dtset%rdmft_adam_rate=dprarr(1)
 
+ call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_chkpt_freq',tread,'INT')
+ if(tread==1) dtset%rdmft_chkpt_freq=intarr(1)
+
  call intagm(dprarr,intarr,jdtset,marr,1,string(1:lenstr),'rdmft_complete',tread,'INT')
  if(tread==1) dtset%rdmft_complete=intarr(1)
 

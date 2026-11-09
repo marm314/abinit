@@ -20076,6 +20076,24 @@ Factor that multiplies the ADAM learning rate [[rdmft_adam_lr]] after a run that
 ),
 
 Variable(
+    abivarname="rdmft_chkpt_freq",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=5,
+    mnemonics="Reduced Density Matrix Functional Theory: CHeCKPoinT FREQuency",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+With [[prtwf]] = 1, the WFK file and the restart file (*_RDMFT_RESTART) of an RDMFT calculation ([[optdriver]] = 11) with
+optimization of the orbitals ([[rdmft_orb_macro]] > 0) are rewritten every [[rdmft_chkpt_freq]] macro-iterations, so that an
+interrupted job can be restarted ([[rdmft_restart]]) from the last checkpoint. If 0, the files are only written at the end
+of the run (which is always done). The files are written under a temporary name and then moved over the previous ones.
+""",
+),
+
+Variable(
     abivarname="rdmft_complete",
     varset="dev",
     vartype="integer",

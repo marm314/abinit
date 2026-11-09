@@ -928,6 +928,9 @@ contains
  dprarr(1,:)=dtsets(:)%rdmft_adam_rate
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_rate','DPR',0)
 
+ intarr(1,:)=dtsets(:)%rdmft_chkpt_freq
+ call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_chkpt_freq','INT',0)
+
  intarr(1,:)=dtsets(:)%rdmft_complete
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_complete','INT',0)
 

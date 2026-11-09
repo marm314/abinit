@@ -2851,6 +2851,7 @@ subroutine indefo(dtsets, ndtset_alloc, nprocs)
    dtsets(idtset)%rdmft_occ_min=1.0e-6_dp
    dtsets(idtset)%rdmft_occ_skip=1.0e-5_dp
    dtsets(idtset)%rdmft_complete=0
+   dtsets(idtset)%rdmft_chkpt_freq=5
    dtsets(idtset)%rdmft_adam_incr=20
    dtsets(idtset)%rdmft_adam_maxit=200
    dtsets(idtset)%rdmft_adam_betam=0.7_dp
