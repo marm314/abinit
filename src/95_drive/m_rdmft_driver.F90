@@ -32,7 +32,7 @@ module m_rdmft_driver
  use m_dtfil,             only : datafiles_type
  use m_dtset,             only : dataset_type
  use m_fstrings,          only : sjoin
- use m_io_tools,          only : open_file
+ use m_io_tools,          only : get_unit, open_file
  use m_nctk,              only : nctk_try_fort_or_ncfile
  use m_pawfgr,            only : pawfgr_type, pawfgr_init, pawfgr_destroy
  use m_pawrad,            only : pawrad_type
@@ -46,7 +46,7 @@ module m_rdmft_driver
  use m_rdmft_fock,        only : rdmft_fock_hartree_k
  use m_mpinfo,            only : destroy_mpi_enreg, initmpi_seq
  use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t, rdmft_tint, rdmft_tprof
- use m_rdmft_optimizer,   only : rdmft_grad_jk, rdmft_optimize_jk, rdmft_optimize_pnof
+ use m_rdmft_optimizer,   only : rdmft_grad_jk, rdmft_optimize_jk, rdmft_optimize_pnof, rdmft_tpnof
  use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
  use m_specialmsg,        only : wrtout
  use m_time,              only : abi_wtime
@@ -126,7 +126,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  complex(dpc),allocatable :: hmat(:,:,:)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
  real(dp) :: tm(8),t0,tint_max(6),tint_min(6),t_start,tst(7)
- integer :: nrel_last
+ integer :: nrel_last,nmem_eval
 
 ! *************************************************************************
 
@@ -135,8 +135,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  tm = zero
  rdmft_tint = zero
  rdmft_tprof = zero
+ rdmft_tpnof = zero
  t_start = abi_wtime()
  tst = zero
+ nmem_eval = 0
  is_jk = (dtset%rdmft_functional >= RDMFT_SD .and. dtset%rdmft_functional <= RDMFT_MULLER_AS)
  is_pnof = (dtset%rdmft_functional >= RDMFT_PNOF5 .and. dtset%rdmft_functional <= RDMFT_GNOF)
 
@@ -337,6 +339,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
                    dtset%rdmft_core_ints == 1,reduce=(dtset%rdmft_tr_reduce == 1))
  tst(4) = abi_wtime()-t_start
+ call report_mem('after the integrals')
  nf = ints%nfree
  ABI_MALLOC(nf_gs,(nf))
  ABI_MALLOC(h1f,(nf))
@@ -461,6 +464,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
 
    call optimize_occupations(n0,eopt,conv,niter,.true.)
    tst(5) = abi_wtime()-t_start
+   call report_mem('after the first occupation optimization')
    write(msg,'(2a,i0,a,l1,a)') ch10,' RDMFT: occupation numbers optimized for the functional ',dtset%rdmft_functional,&
      ' (converged = ',conv,')'
    call wrtout([ab_out,std_out],msg)
@@ -484,6 +488,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    call print_occupations()
    call print_final_energies()
    tst(7) = abi_wtime()-t_start
+   call report_mem('end of the run')
    write(msg,'(a,7f9.2)') ' RDMFT: elapsed (s) after read WFK / completion+TR / orbital setup / integrals / first occupations'//&
      ' / orbital macro / output =',tst
    call wrtout([ab_out,std_out],msg)
@@ -521,6 +526,30 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  call orbs%free()
 
 contains
+
+ subroutine report_mem(label)
+   ! Peak and current resident memory of this process (Linux /proc/self/status), printed by the master
+   character(len=*),intent(in) :: label
+   character(len=200) :: line
+   character(len=60) :: hwm,rss
+   integer :: ios,unt
+   hwm = '?'; rss = '?'
+   unt = get_unit()
+   open(unit=unt,file='/proc/self/status',status='old',action='read',iostat=ios)
+   if (ios == 0) then
+     do
+       read(unt,'(a)',iostat=ios) line
+       if (ios /= 0) exit
+       if (line(1:6) == 'VmHWM:') hwm = adjustl(line(7:))
+       if (line(1:6) == 'VmRSS:') rss = adjustl(line(7:))
+     end do
+     close(unt)
+   end if
+   if (xmpi_comm_rank(xmpi_world) == master) then
+     write(msg,'(4a)') ' RDMFT: memory of the master process ',trim(label),': peak '//trim(hwm)//', current ',trim(rss)
+     call wrtout([ab_out,std_out],msg)
+   end if
+ end subroutine report_mem
 
  subroutine optimize_occupations(nstart,e_out,conv_out,nit_out,talkative)
    ! Optimization of the occupations (nopt) for the current integrals and one-electron elements
@@ -1012,6 +1041,8 @@ contains
                      dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,req=req,rel=relev,&
                      reduce=(dtset%rdmft_tr_reduce == 1))
    tm(1) = tm(1)+abi_wtime()-t0
+   nmem_eval = nmem_eval+1
+   if (nmem_eval <= 2) call report_mem('ORB: eval_point after the integrals and Fock exchange')
    t0 = abi_wtime()
    call sync_h1f()
    e_out = energy_cur()
@@ -1068,6 +1099,7 @@ contains
    end do
    gmax = zero
    if (size(grad) > 0) gmax = maxval(abs(grad))
+   if (nmem_eval <= 2) call report_mem('ORB: eval_point after the Hartree part')
    ABI_FREE(relev)
    ABI_FREE(req%want)
    ABI_FREE(req%ccoef)
@@ -1200,6 +1232,7 @@ contains
    ABI_MALLOC(h1c_b,(nbk))
    ABI_MALLOC(hmat_b,(size(hmat,1),size(hmat,2),size(hmat,3)))
    call adam%init(npar,dtset%rdmft_adam_betam,dtset%rdmft_adam_betav)
+   call report_mem('ORB: ADAM arrays allocated')
    write(msg,'(2a,i0,a,es9.2,a,es9.2,a,es9.2,a)') ch10,' RDMFT: ADAM optimization of the orbitals (',npar,&
      ' complex rotation parameters); energy tolerance ',dtset%rdmft_orb_etol,', gradient tolerance ',dtset%rdmft_orb_gtol,&
      ', learning rate ',dtset%rdmft_adam_lr,ch10
@@ -1288,6 +1321,7 @@ contains
        lr = dtset%rdmft_adam_lr
        extra = 0
      end if
+     if (imac == 1) call report_mem('ORB: macro-iteration 1, after the ADAM run')
      orbs = orbs_b
      h1c = h1c_b
      hmat = hmat_b
@@ -1297,6 +1331,7 @@ contains
      call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
                        dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,reduce=(dtset%rdmft_tr_reduce == 1))
      tm(7) = tm(7)+abi_wtime()-t0
+     if (imac == 1) call report_mem('ORB: macro-iteration 1, full integrals for the occupations')
      call sync_h1f()
      ! Occupations for the new orbitals
      t0 = abi_wtime()
@@ -1352,6 +1387,8 @@ contains
    call wrtout([ab_out,std_out],msg)
    write(msg,'(a,5f10.2,f10.2,es11.3)') '   K sweep profile, rank 0: toreal(k), toreal(k2), product, FFT, K value, Fock ZGEMM, n_FFT = ',&
      rdmft_tprof(1:6),rdmft_tprof(7)
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,4f10.2,f10.0)') '   PNOF evaluation profile: occupations+Jacobian, energy, gradient, contraction, n_eval =',rdmft_tpnof
    call wrtout([ab_out,std_out],msg)
    if (dtset%rdmft_occ_skip > zero) call spot_check(kpar)
    if (dtset%prtvol >= 10) call check_h()

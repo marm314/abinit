@@ -34,6 +34,7 @@ module m_rdmft_optimizer
  use m_rdmft_functionals, only : rdmft_bg_t, rdmft_energy_jk, rdmft_energy_pnof, rdmft_grad_pnof, rdmft_jk_diag, &
                                  rdmft_jk_pair, rdmft_pnof_gamma, rdmft_pnof_occ, rdmft_pnof_table_t
  use m_specialmsg,        only : wrtout
+ use m_time,              only : abi_wtime
 
  implicit none
 
@@ -41,6 +42,11 @@ module m_rdmft_optimizer
 !!***
 
  public :: rdmft_grad_jk
+ public :: rdmft_tpnof
+
+ !> Profile of the evaluation of the PNOF energy and gradient: 1 occupations and Jacobian, 2 energy, 3 orbital gradient,
+ !> 4 contraction with the Jacobian, 5 number of evaluations
+ real(dp),save :: rdmft_tpnof(5) = 0.0_dp
  public :: rdmft_optimize_jk
  public :: rdmft_optimize_pnof
 !!***
@@ -1113,7 +1119,9 @@ contains
    real(dp),intent(in) :: gv(ngam)
    real(dp),intent(out) :: e,gg(ngam)
    integer :: jp,jv,ji
+   real(dp) :: tev
    real(dp),allocatable :: nv(:),jac(:,:),gorb(:),gvar(:),nfull(:)
+   tev = abi_wtime()
    ABI_MALLOC(nv,(table%nvar))
    ABI_MALLOC(jac,(table%nvar,ngam))
    ABI_MALLOC(gorb,(nbk))
@@ -1124,8 +1132,14 @@ contains
    do jp=1,nbk
      if (table%orb_var(jp) > 0) nfull(jp) = nv(table%orb_var(jp))
    end do
+   rdmft_tpnof(1) = rdmft_tpnof(1)+abi_wtime()-tev
+   tev = abi_wtime()
    e = rdmft_energy_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint,bj,bk,bg)
+   rdmft_tpnof(2) = rdmft_tpnof(2)+abi_wtime()-tev
+   tev = abi_wtime()
    call rdmft_grad_pnof(func,table,nk,nbk,nfull,h1,jint,kint,selfint,bj,bk,gorb)
+   rdmft_tpnof(3) = rdmft_tpnof(3)+abi_wtime()-tev
+   tev = abi_wtime()
    gvar = zero
    do jp=1,nbk
      if (table%orb_var(jp) > 0) gvar(table%orb_var(jp)) = gvar(table%orb_var(jp))+gorb(jp)
@@ -1139,6 +1153,8 @@ contains
    ABI_FREE(nv)
    ABI_FREE(jac)
    ABI_FREE(gorb)
+   rdmft_tpnof(4) = rdmft_tpnof(4)+abi_wtime()-tev
+   rdmft_tpnof(5) = rdmft_tpnof(5)+one
    ABI_FREE(gvar)
    ABI_FREE(nfull)
  end subroutine eval
