@@ -225,6 +225,10 @@ JK-only functional for a PNOF run. A JK-only functional can restart from a PNOF 
 orbitals ([[rdmft_orb_macro]] = 0) the energy of the restart state is reproduced exactly and the occupations are
 converged in one iteration. Without a restart file, `RDMFT_OCC.in` is used as before (occupations only).
 
+With [[prtwf]] = 1 the WFK and restart files are also rewritten after every macro-iteration of the orbital optimization
+([[rdmft_orb_macro]]), so that a job that is interrupted (time limit, crash) can be restarted from the last completed
+macro-iteration. The files are written under a temporary name and then moved, so that they are never left half-written.
+
 ## Degenerate states and the choice of the orbitals
 
 The energy of a functional with fractional occupations (MBB, CGA, MLSIC, GU, ...) at **fixed** orbitals is not invariant under

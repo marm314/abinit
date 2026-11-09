@@ -1397,6 +1397,11 @@ contains
      if (.not.conv2) stat = trim(stat)//'; occupations not converged'
      write(msg,'(a,i6,f20.12,es16.3,es10.2,2i10,2a)') '  MACRO',imac,e_new,e_new-e_old,gmax,nadam,nit2,'  ',trim(stat)
      call wrtout([ab_out,std_out],msg)
+     if (dtset%prtwf > 0) then
+       rst_lr1 = lr
+       rst_conv = conv2
+       call write_checkpoint(e_new)
+     end if
      nstall = merge(nstall+1,0,abs(e_new-e_old) < dtset%rdmft_orb_etol)
      mi = imac
      if (abs(e_new-e_old) < dtset%rdmft_orb_etol .and. gmax < dtset%rdmft_orb_gtol .and. (.not.restart .or. gconv)) then
@@ -1525,6 +1530,43 @@ contains
    write(msg,'(4a)') trim(ln(5))//ch10,trim(ln(6))//ch10,trim(ln(7))//ch10,trim(ln(8))
    call wrtout([ab_out,std_out],msg)
  end subroutine print_occupations
+
+ subroutine write_checkpoint(e_tot)
+   ! Checkpoint after a macro-iteration of the orbital optimization (prtwf > 0): WFK and restart files of the current state,
+   ! written under a temporary name and moved over the previous ones, so that a job killed during the writing leaves a
+   ! consistent pair
+   real(dp),intent(in) :: e_tot
+   integer :: jk,nb2
+   real(dp),allocatable :: eig_w(:,:),occ_w(:,:)
+   type(hdr_type) :: hdr_w
+   character(len=fnlen) :: wtmp,wfin,rfin
+   if (xmpi_comm_rank(xmpi_world) /= master) return
+   ABI_MALLOC(eig_w,(orbs%mband,orbs%nkpt))
+   ABI_MALLOC(occ_w,(orbs%mband,orbs%nkpt))
+   eig_w = zero
+   occ_w = zero
+   do jk=1,orbs%nkpt
+     nb2 = orbs%nband(jk,1)
+     eig_w(1:nb2,jk) = h1c(offset(jk)+1:offset(jk)+nb2)
+     occ_w(1:nb2,jk) = two*nfull(offset(jk)+1:offset(jk)+nb2)
+   end do
+   call orbs%make_hdr(hdr_w,occ_w)
+   wtmp = trim(dtfil%fnameabo_wfk)//'.chk'
+   wfin = dtfil%fnameabo_wfk
+   if (dtset%iomode == IO_MODE_ETSF) then
+     wtmp = nctk_ncify(wtmp)
+     wfin = nctk_ncify(wfin)
+   end if
+   rfin = trim(dtfil%filnam_ds(4))//'_RDMFT_RESTART'
+   call orbs%write_wfk(trim(dtfil%fnameabo_wfk)//'.chk',dtset%iomode,hdr_w,eig_w,occ_w)
+   call write_restart_file(trim(rfin)//'.chk',e_tot,quiet=.true.)
+   call execute_command_line('mv -f "'//trim(wtmp)//'" "'//trim(wfin)//'" && mv -f "'//trim(rfin)//'.chk" "'//trim(rfin)//'"')
+   write(msg,'(2a)') '  RDMFT: checkpoint written (',trim(wfin)//' and '//trim(rfin)//')'
+   call wrtout([ab_out,std_out],msg)
+   call hdr_w%free()
+   ABI_FREE(eig_w)
+   ABI_FREE(occ_w)
+ end subroutine write_checkpoint
 
  subroutine write_natural_orbitals()
    ! WFK file (natural orbitals, occupations 2 n between 0 and 2, eigenvalues = diagonal of the one-electron Hamiltonian)
@@ -1849,11 +1891,12 @@ contains
    call wrtout([ab_out,std_out],msg)
  end subroutine find_restart_file
 
- subroutine write_restart_file(fname,etot_final)
+ subroutine write_restart_file(fname,etot_final,quiet)
    ! Binary restart file (stream): magic, metadata, occupations, classification of the orbitals, PNOF table (composite
    ! orbital indices) and angles, learning rate of ADAM. The orbitals are in the WFK file (prtwf = 1).
    character(len=*),intent(in) :: fname
    real(dp),intent(in) :: etot_final
+   logical,optional,intent(in) :: quiet
    integer :: unt,ios,jf,ig
    integer,allocatable :: gorb(:),ovar(:)
    real(dp),allocatable :: gam_w(:)
@@ -1893,6 +1936,9 @@ contains
      ABI_FREE(gam_w)
    end if
    close(unt)
+   if (present(quiet)) then
+     if (quiet) return
+   end if
    write(msg,'(3a)') ' RDMFT: restart file written in ',trim(fname),' (to be used with the WFK file and rdmft_restart = 1)'
    call wrtout([ab_out,std_out],msg)
  end subroutine write_restart_file
