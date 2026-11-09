@@ -1185,88 +1185,112 @@ subroutine rdmft_grad_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,bj,bk,grad)
 
  !Local variables-------------------------------
  !scalars
- integer :: ia,ib,ig,ip,iq,sa,sb
+ integer :: ia,ib,ig,ip,ng,sa
  real(dp),parameter :: tiny_den = 1.0e-300_dp
- real(dp) :: dpi,dpr,dsa,dnd,ea,eb,f,g,hpa,hpb,na,nb,nda,ndb,nk2,sigma,viap
- logical :: same_sub
+ real(dp) :: dpi,dpr,dnd,dsa,ea,f,hpa,na,nda,nk2,sigma,viap,sga
+ logical :: pra,same_sub
  !arrays
- integer,allocatable :: prin_orb(:)
- real(dp),allocatable :: gp(:),hprin(:)
+ integer,allocatable :: iorb(:),prin_orb(:),sub(:)
+ logical,allocatable :: pr(:)
+ real(dp),allocatable :: gp(:),gt(:),hprin(:),jcol(:),kcol(:),nd(:),nt(:),sd(:),sn(:),st(:)
 
 ! *************************************************************************
 
+ if (func /= RDMFT_PNOF5 .and. func /= RDMFT_PNOF7 .and. func /= RDMFT_PNOF7S .and. func /= RDMFT_GNOF) then
+   ABI_ERROR('RDMFT: unknown PNOF functional.')
+ end if
  grad = zero
  nk2 = real(nk,dp)**2
+ ng = table%ng
  ABI_MALLOC(prin_orb,(table%nsub))
  ABI_MALLOC(hprin,(table%nsub))
  ABI_MALLOC(gp,(table%nsub))
  prin_orb = 0
  hprin = one
  gp = zero
- do ig=1,table%ng
+ do ig=1,ng
    if (table%gem_principal(ig)) then
      prin_orb(table%gem_sub(ig)) = table%gem_orb(ig)
      hprin(table%gem_sub(ig)) = one-n(table%gem_orb(ig))
    end if
  end do
 
- do ia=1,table%ng
-   ip = table%gem_orb(ia)
-   sa = table%gem_sub(ia)
-   na = n(ip)
+ ! Per-orbital quantities of the table (the square roots and exponentials are computed once per orbital, not per pair)
+ ABI_MALLOC(iorb,(ng))
+ ABI_MALLOC(sub,(ng))
+ ABI_MALLOC(pr,(ng))
+ ABI_MALLOC(nt,(ng))
+ ABI_MALLOC(gt,(ng))
+ ABI_MALLOC(st,(ng))
+ ABI_MALLOC(sn,(ng))
+ ABI_MALLOC(nd,(ng))
+ ABI_MALLOC(sd,(ng))
+ ABI_MALLOC(jcol,(ng))
+ ABI_MALLOC(kcol,(ng))
+ do ig=1,ng
+   iorb(ig) = table%gem_orb(ig)
+   sub(ig) = table%gem_sub(ig)
+   pr(ig) = table%gem_principal(ig)
+   nt(ig) = n(iorb(ig))
+   gt(ig) = nt(ig)*(one-nt(ig))
+   st(ig) = sqrt(max(zero,gt(ig)))
+   sn(ig) = sqrt(max(zero,nt(ig)))
+   nd(ig) = nt(ig)*exp(-(hprin(sub(ig))/gnof_c)**2)
+   sd(ig) = sqrt(max(zero,nd(ig)))
+ end do
+
+ do ia=1,ng
+   ip = iorb(ia)
+   sa = sub(ia)
+   na = nt(ia)
+   f = gt(ia)
+   pra = pr(ia)
+   hpa = hprin(sa)
+   ea = exp(-(hpa/gnof_c)**2)
+   nda = nd(ia)
+   ! The integrals are symmetric: the column ip is used (contiguous in memory)
+   do ib=1,ng
+     jcol(ib) = jint(iorb(ib),ip)
+     kcol(ib) = kint(iorb(ib),ip)
+   end do
    grad(ip) = grad(ip)+two*h1(ip)/nk+(jint(ip,ip)+two*real(selfint,dp)*na*(jint(ip,ip)-kint(ip,ip)))/nk2
-   do ib=1,table%ng
+   do ib=1,ng
      if (ib == ia) cycle
-     iq = table%gem_orb(ib)
-     sb = table%gem_sub(ib)
-     nb = n(iq)
-     same_sub = (sa == sb)
-     viap = zero
+     same_sub = (sa == sub(ib))
      if (same_sub) then
        sigma = one
-       if (table%gem_principal(ia) .or. table%gem_principal(ib)) sigma = -one
+       if (pra .or. pr(ib)) sigma = -one
        dpi = zero
-       if (na > tiny_den) dpi = sigma*half*sqrt(max(zero,nb/na))
-       grad(ip) = grad(ip)+two*dpi*kint(ip,iq)/nk2
+       if (na > tiny_den) dpi = sigma*half*sn(ib)/sn(ia)
+       grad(ip) = grad(ip)+two*dpi*kcol(ib)/nk2
      else
-       f = na*(one-na)
-       g = nb*(one-nb)
        dpi = zero
+       viap = zero
        select case (func)
-       case (RDMFT_PNOF5)
-         dpi = zero
        case (RDMFT_PNOF7)
-         if (f > tiny_den) dpi = -half*sqrt(max(zero,g/f))*(one-two*na)
+         if (f > tiny_den) dpi = -half*(st(ib)/st(ia))*(one-two*na)
        case (RDMFT_PNOF7S)
-         dpi = -four*(one-two*na)*g
+         dpi = -four*(one-two*na)*gt(ib)
        case (RDMFT_GNOF)
-         if (.not.(table%gem_principal(ia) .and. table%gem_principal(ib))) then
-           hpa = hprin(sa); hpb = hprin(sb)
-           ea = exp(-(hpa/gnof_c)**2); eb = exp(-(hpb/gnof_c)**2)
-           nda = na*ea; ndb = nb*eb
-           sigma = one
-           if (table%gem_principal(ia) .neqv. table%gem_principal(ib)) sigma = -one
-           dnd = ndb
-           if (nda > tiny_den) dnd = ndb+sigma*half*sqrt(max(zero,ndb/nda))
+         if (.not.(pra .and. pr(ib))) then
+           sga = one
+           if (pra .neqv. pr(ib)) sga = -one
+           dnd = nd(ib)
+           if (nda > tiny_den) dnd = nd(ib)+sga*half*sd(ib)/sd(ia)
            dsa = zero
-           if (f > tiny_den) dsa = half*sqrt(max(zero,g/f))*(one-two*na)
+           if (f > tiny_den) dsa = half*(st(ib)/st(ia))*(one-two*na)
            dpi = dnd*ea-dsa
            viap = dnd*nda*two*hpa/gnof_c**2
          end if
-       case default
-         ABI_ERROR('RDMFT: unknown PNOF functional.')
        end select
-       dpr = nb*(two*jint(ip,iq)-kint(ip,iq))+dpi*kint(ip,iq)
+       dpr = nt(ib)*(two*jcol(ib)-kcol(ib))+dpi*kcol(ib)
        grad(ip) = grad(ip)+two*dpr/nk2
-       if (viap /= zero) gp(sa) = gp(sa)+two*viap*kint(ip,iq)/nk2
+       if (viap /= zero) gp(sa) = gp(sa)+two*viap*kcol(ib)/nk2
      end if
    end do
    ! Interaction with the background orbitals (see rdmft_energy_pnof)
    dpi = zero
-   if (func == RDMFT_GNOF .and. .not.table%gem_principal(ia)) then
-     hpa = hprin(sa)
-     ea = exp(-(hpa/gnof_c)**2)
-     nda = na*ea
+   if (func == RDMFT_GNOF .and. .not.pra) then
      dnd = one
      if (nda > tiny_den) dnd = one-half/sqrt(nda)
      dpi = dnd*ea
@@ -1282,6 +1306,17 @@ subroutine rdmft_grad_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,bj,bk,grad)
  ABI_FREE(prin_orb)
  ABI_FREE(hprin)
  ABI_FREE(gp)
+ ABI_FREE(iorb)
+ ABI_FREE(sub)
+ ABI_FREE(pr)
+ ABI_FREE(nt)
+ ABI_FREE(gt)
+ ABI_FREE(st)
+ ABI_FREE(sn)
+ ABI_FREE(nd)
+ ABI_FREE(sd)
+ ABI_FREE(jcol)
+ ABI_FREE(kcol)
 
 end subroutine rdmft_grad_pnof
 !!***
@@ -1315,78 +1350,103 @@ function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,bj,bk,bg) re
 
  !Local variables-------------------------------
  !scalars
- integer :: ia,ib,ig,ip,iq
- real(dp) :: cross,e1,e2,hab,hha,hhb,na,nb,nda,ndb,pi_ab,pifz,xab
- logical :: same_sub
+ integer :: ia,ib,ig,ip,iq,ng
+ real(dp) :: e1,e2,na,pi_ab,pifz,xab,nda
  !arrays
- real(dp),allocatable :: hprin(:)
+ integer,allocatable :: iorb(:),sub(:)
+ logical,allocatable :: pr(:)
+ real(dp),allocatable :: gt(:),hprin(:),jcol(:),kcol(:),nd(:),nt(:),sd(:),sn(:),st(:)
 
 ! *************************************************************************
 
+ if (func /= RDMFT_PNOF5 .and. func /= RDMFT_PNOF7 .and. func /= RDMFT_PNOF7S .and. func /= RDMFT_GNOF) then
+   ABI_ERROR('RDMFT: unknown PNOF functional.')
+ end if
+ ng = table%ng
  ! Holes of the principal pair of each subspace (needed by GNOF)
  ABI_MALLOC(hprin,(table%nsub))
  hprin = one
- do ig=1,table%ng
+ do ig=1,ng
    if (table%gem_principal(ig)) hprin(table%gem_sub(ig)) = one-n(table%gem_orb(ig))
+ end do
+
+ ! Per-orbital quantities of the table (the square roots and exponentials are computed once per orbital, not per pair)
+ ABI_MALLOC(iorb,(ng))
+ ABI_MALLOC(sub,(ng))
+ ABI_MALLOC(pr,(ng))
+ ABI_MALLOC(nt,(ng))
+ ABI_MALLOC(gt,(ng))
+ ABI_MALLOC(st,(ng))
+ ABI_MALLOC(sn,(ng))
+ ABI_MALLOC(nd,(ng))
+ ABI_MALLOC(sd,(ng))
+ ABI_MALLOC(jcol,(ng))
+ ABI_MALLOC(kcol,(ng))
+ do ig=1,ng
+   iorb(ig) = table%gem_orb(ig)
+   sub(ig) = table%gem_sub(ig)
+   pr(ig) = table%gem_principal(ig)
+   nt(ig) = n(iorb(ig))
+   gt(ig) = nt(ig)*(one-nt(ig))
+   st(ig) = sqrt(max(zero,gt(ig)))
+   sn(ig) = sqrt(max(zero,nt(ig)))
+   nd(ig) = nt(ig)*exp(-(hprin(sub(ig))/gnof_c)**2)
+   sd(ig) = sqrt(max(zero,nd(ig)))
  end do
 
  e1 = zero
  e2 = zero
- do ia=1,table%ng
-   ip = table%gem_orb(ia)
-   na = n(ip)
-   e1 = e1+two*na*h1(ip)
-   e2 = e2+na*jint(ip,ip)
-   ! rdmft_selfint=1: same-spin self term of the orbital, n^2 (J_pp-K_pp), nonzero when K_pp /= J_pp (periodic systems)
-   if (selfint == 1) e2 = e2+na**2*(jint(ip,ip)-kint(ip,ip))
-   do ib=1,table%ng
-     if (ib == ia) cycle
-     iq = table%gem_orb(ib)
-     nb = n(iq)
-     same_sub = (table%gem_sub(ia) == table%gem_sub(ib))
-     xab = na*nb
-     if (same_sub) xab = zero
-     ! Hartree and exchange weights: H_ab=2 X_ab with X_ab = n_a n_b outside the subspace
-     hab = two*xab
-     ! Pairing term Pi_ab
-     hha = one-na
-     hhb = one-nb
-     if (same_sub) then
-       pi_ab = sqrt(max(zero,na*nb))
-       if (table%gem_principal(ia) .or. table%gem_principal(ib)) pi_ab = -pi_ab
+ ! The pair terms are symmetric in (a,b): the loop over a runs inside a column of the integrals (contiguous in memory)
+ do ib=1,ng
+   iq = iorb(ib)
+   do ia=1,ng
+     jcol(ia) = jint(iorb(ia),iq)
+     kcol(ia) = kint(iorb(ia),iq)
+   end do
+   do ia=1,ng
+     if (ia == ib) cycle
+     if (sub(ia) == sub(ib)) then
+       ! same subspace: no Hartree/exchange weight; pairing term
+       pi_ab = sn(ia)*sn(ib)
+       if (pr(ia) .or. pr(ib)) pi_ab = -pi_ab
+       e2 = e2+pi_ab*kcol(ia)
      else
+       xab = nt(ia)*nt(ib)
        select case (func)
        case (RDMFT_PNOF5)
          pi_ab = zero
        case (RDMFT_PNOF7)
-         pi_ab = -sqrt(max(zero,na*nb*hha*hhb))
+         pi_ab = -st(ia)*st(ib)
        case (RDMFT_PNOF7S)
-         pi_ab = -four*na*nb*hha*hhb
+         pi_ab = -four*gt(ia)*gt(ib)
        case (RDMFT_GNOF)
-         if (table%gem_principal(ia) .and. table%gem_principal(ib)) then
+         if (pr(ia) .and. pr(ib)) then
            pi_ab = zero
          else
-           nda = na*exp(-(hprin(table%gem_sub(ia))/gnof_c)**2)
-           ndb = nb*exp(-(hprin(table%gem_sub(ib))/gnof_c)**2)
-           cross = sqrt(max(zero,nda*ndb))
-           pi_ab = nda*ndb-sqrt(max(zero,na*nb*hha*hhb))
-           if (table%gem_principal(ia) .neqv. table%gem_principal(ib)) then
-             pi_ab = pi_ab-cross
+           pi_ab = nd(ia)*nd(ib)-st(ia)*st(ib)
+           if (pr(ia) .neqv. pr(ib)) then
+             pi_ab = pi_ab-sd(ia)*sd(ib)
            else
-             pi_ab = pi_ab+cross
+             pi_ab = pi_ab+sd(ia)*sd(ib)
            end if
          end if
-       case default
-         ABI_ERROR('RDMFT: unknown PNOF functional.')
        end select
+       e2 = e2+two*xab*jcol(ia)-xab*kcol(ia)+pi_ab*kcol(ia)
      end if
-     e2 = e2+hab*jint(ip,iq)-xab*kint(ip,iq)+pi_ab*kint(ip,iq)
    end do
+ end do
+ do ia=1,ng
+   ip = iorb(ia)
+   na = nt(ia)
+   e1 = e1+two*na*h1(ip)
+   e2 = e2+na*jint(ip,ip)
+   ! rdmft_selfint=1: same-spin self term of the orbital, n^2 (J_pp-K_pp), nonzero when K_pp /= J_pp (periodic systems)
+   if (selfint == 1) e2 = e2+na**2*(jint(ip,ip)-kint(ip,ip))
    ! Interaction with the background orbitals (frozen occupied pairs, n=1, trivial subspaces), for the two orders of
    ! the pairs. Their Pi term only survives for GNOF and a non-principal pair a.
    pifz = zero
-   if (func == RDMFT_GNOF .and. .not.table%gem_principal(ia)) then
-     nda = na*exp(-(hprin(table%gem_sub(ia))/gnof_c)**2)
+   if (func == RDMFT_GNOF .and. .not.pr(ia)) then
+     nda = nd(ia)
      pifz = nda-sqrt(max(zero,nda))
    end if
    e2 = e2+two*(na*(two*bj(ip)-bk(ip))+pifz*bk(ip))
@@ -1394,6 +1454,17 @@ function rdmft_energy_pnof(func,table,nk,nbk,n,h1,jint,kint,selfint,bj,bk,bg) re
  energy = e1/nk+e2/real(nk,dp)**2+rdmft_energy_bg(func,nk,bg,zero,selfint)
 
  ABI_FREE(hprin)
+ ABI_FREE(iorb)
+ ABI_FREE(sub)
+ ABI_FREE(pr)
+ ABI_FREE(nt)
+ ABI_FREE(gt)
+ ABI_FREE(st)
+ ABI_FREE(sn)
+ ABI_FREE(nd)
+ ABI_FREE(sd)
+ ABI_FREE(jcol)
+ ABI_FREE(kcol)
 
 end function rdmft_energy_pnof
 !!***
