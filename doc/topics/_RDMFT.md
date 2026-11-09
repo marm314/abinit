@@ -220,7 +220,7 @@ subspace) and the optimized angles, and the learning rate of ADAM. The table and
 orbital energies and occupations, since the WFK file of an RDMFT run does not contain ground-state energies. The restart
 is refused (with an explanation) if the file does not correspond to the calculation: number of k-points, bands or
 electrons, [[rdmft_nocc_act]], [[rdmft_nvir_act]], [[rdmft_ecut_act]], [[rdmft_ncoupl]] (PNOF), or a restart file of a
-JK-only functional for a PNOF run. A JK-only functional can restart from a PNOF file and vice versa is not possible. The
+JK-only functional for a PNOF run. A JK-only functional can restart from a PNOF file, but not the reverse. The
 "ground-state" energies and the density change printed at the beginning refer to the restart state: with fixed
 orbitals ([[rdmft_orb_macro]] = 0) the energy of the restart state is reproduced exactly and the occupations are
 converged in one iteration. Without a restart file, `RDMFT_OCC.in` is used as before (occupations only).
