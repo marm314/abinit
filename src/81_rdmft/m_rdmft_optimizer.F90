@@ -40,6 +40,7 @@ module m_rdmft_optimizer
  private
 !!***
 
+ public :: rdmft_grad_jk
  public :: rdmft_optimize_jk
  public :: rdmft_optimize_pnof
 !!***
@@ -566,6 +567,56 @@ contains
  end subroutine gradient_hessian
 
 end subroutine rdmft_optimize_jk
+!!***
+
+!!****f* m_rdmft_optimizer/rdmft_grad_jk
+!! NAME
+!!  rdmft_grad_jk
+!!
+!! FUNCTION
+!!  Exact gradient of the JK-only energy with respect to the occupation of each orbital (the other occupations fixed,
+!!  without the ties between k and -k): g_p = dE/dn_p.
+!!
+!! INPUTS
+!!  func, nk, nbk, h1, jint, kint, alpha, bj, bk = as rdmft_energy_jk
+!!  n(nbk) = occupations
+!!
+!! OUTPUT
+!!  gorb(nbk) = dE/dn_p
+!!
+!! SOURCE
+subroutine rdmft_grad_jk(func,nk,nbk,h1,jint,kint,alpha,n,bj,bk,gorb)
+
+ !Arguments ------------------------------------
+ !scalars
+ integer,intent(in) :: func,nk,nbk
+ real(dp),intent(in) :: alpha
+ !arrays
+ real(dp),intent(in) :: n(nbk),h1(nbk),jint(nbk,nbk),kint(nbk,nbk),bj(nbk),bk(nbk)
+ real(dp),intent(out) :: gorb(nbk)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: jp,jq
+ real(dp) :: ff,fa,faa,fab,fd,fd1,fd2,gsum,nk2
+
+! *************************************************************************
+
+ nk2 = real(nk,dp)**2
+ do jp=1,nbk
+   gsum = zero
+   do jq=1,nbk
+     if (jq == jp) cycle
+     call rdmft_jk_pair(func,n(jp),n(jq),jint(jp,jq),kint(jp,jq),alpha,ff,fa,faa,fab)
+     gsum = gsum+two*fa
+   end do
+   call rdmft_jk_pair(func,n(jp),one,bj(jp),bk(jp),alpha,ff,fa,faa,fab)
+   gsum = gsum+two*fa
+   call rdmft_jk_diag(func,n(jp),jint(jp,jp),kint(jp,jp),alpha,fd,fd1,fd2)
+   gorb(jp) = two*h1(jp)/nk+(fd1+gsum)/nk2
+ end do
+
+end subroutine rdmft_grad_jk
 !!***
 
 !!****f* m_rdmft_optimizer/rdmft_optimize_pnof

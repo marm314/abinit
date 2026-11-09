@@ -44,8 +44,9 @@ module m_rdmft_driver
                                  rdmft_functional_name, rdmft_pnof_table_remap, rdmft_pnof_table_t
  use m_rdmft_hamiltonian, only : rdmft_one_electron
  use m_rdmft_fock,        only : rdmft_fock_hartree_k
- use m_rdmft_integrals,   only : rdmft_fockreq_t, rdmft_ints_t
- use m_rdmft_optimizer,   only : rdmft_optimize_jk, rdmft_optimize_pnof
+ use m_mpinfo,            only : destroy_mpi_enreg, initmpi_seq
+ use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t
+ use m_rdmft_optimizer,   only : rdmft_grad_jk, rdmft_optimize_jk, rdmft_optimize_pnof
  use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
  use m_specialmsg,        only : wrtout
  use m_time,              only : abi_wtime
@@ -108,8 +109,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  real(dp) :: alpha,e_corepsp,e_ewald,eexch,ehartree,ekin_tot,eone,eopt,ecut_eff,ecutdg_eff,etot,gsqcutc_eff,gsqcutf_eff
  real(dp) :: devtr,maxdev,ntarget,nk2,sexch,shart
  character(len=500) :: msg
+ character(len=100) :: eline(6)
  character(len=fnlen) :: wfk_path
  type(pawfgr_type) :: pawfgr
+ type(MPI_type) :: mpi_seq
  type(rdmft_bg_t) :: bgt
  type(rdmft_ints_t) :: ints
  type(rdmft_orbs_t) :: orbs
@@ -118,6 +121,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  integer :: ngfftc(18),ngfftf(18)
  integer,allocatable :: bandc(:),noccb(:),offset(:),partner(:),partf(:)
  real(dp),parameter :: k0(3)=zero
+ real(dp),allocatable :: rho_ref(:)
  real(dp),allocatable :: eigc(:),eigf(:),ekin(:,:),h1c(:),h1diag(:,:),h1f(:),n0(:),nc(:),nfull(:),nf_gs(:),nopt(:)
  complex(dpc),allocatable :: hmat(:,:,:)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
@@ -209,6 +213,11 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  !FFT mesh and G^2 cut-off containing the products of two orbitals (same as for the density)
  call pawfgr_init(pawfgr,dtset,mgfftf,nfftf,ecut_eff,ecutdg_eff,ngfftc,ngfftf, &
                   gsqcutc_eff=gsqcutc_eff,gsqcutf_eff=gsqcutf_eff,gmet=orbs%gmet,k0=k0)
+
+ !Sequential MPI_type for the FFTs of the orbitals (density)
+ call initmpi_seq(mpi_seq)
+ call mpi_seq%distribfft%init_seq('c',ngfftf(2),ngfftf(3),'all')
+ call mpi_seq%distribfft%init_seq('f',ngfftf(2),ngfftf(3),'all')
 
  !One-electron part: h_pp with getghc, Ewald and core energies
  if (dtset%rdmft_check_rot > 0 .or. dtset%rdmft_orb_macro > 0) then
@@ -363,13 +372,14 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ehartree = shart/nk2
  eexch = sexch/nk2
  etot = eone+ehartree+eexch+e_ewald+e_corepsp
- write(msg,'(2a,es22.14,2a,es22.14,2a,es22.14,2a,es22.14,2a,es22.14,2a,es22.14,a)') &
-   ch10,' RDMFT: kinetic energy                         = ',ekin_tot,&
-   ch10,' RDMFT: one-electron energy (T + Vloc + Vnl)    = ',eone,&
-   ch10,' RDMFT: Ewald energy                           = ',e_ewald,&
-   ch10,' RDMFT: core pseudopotential energy             = ',e_corepsp,&
-   ch10,' RDMFT: Hartree + exchange                      = ',ehartree+eexch,&
-   ch10,' RDMFT: total energy (SD, ground-state occ.)    = ',etot,ch10
+ ! Energies in a column: label, then the value at a fixed position
+ write(eline(1),'(a,t52,a,es22.14)') ' RDMFT: kinetic energy',' = ',ekin_tot
+ write(eline(2),'(a,t52,a,es22.14)') ' RDMFT: one-electron energy (T + Vloc + Vnl)',' = ',eone
+ write(eline(3),'(a,t52,a,es22.14)') ' RDMFT: Ewald energy',' = ',e_ewald
+ write(eline(4),'(a,t52,a,es22.14)') ' RDMFT: core pseudopotential energy',' = ',e_corepsp
+ write(eline(5),'(a,t52,a,es22.14)') ' RDMFT: Hartree + exchange',' = ',ehartree+eexch
+ write(eline(6),'(a,t52,a,es22.14)') ' RDMFT: total energy (SD, ground-state occ.)',' = ',etot
+ write(msg,'(7a)') ch10,(trim(eline(ip))//ch10,ip=1,6)
  call wrtout([ab_out,std_out],msg)
  if (dtset%rdmft_core_ints == 0) then
    write(msg,'(3a)') ' RDMFT: rdmft_core_ints=0, the exchange among the frozen occupied orbitals is not included in the ',&
@@ -417,6 +427,8 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ABI_MALLOC(n0,(nf))
    ABI_MALLOC(nopt,(nf))
    ABI_MALLOC(nfull,(nbk))
+   ABI_MALLOC(rho_ref,(nfftf))
+   call compute_density(nc,rho_ref)
    n0 = nf_gs
    if (dtset%rdmft_start == 1) then
      if (is_pnof) then
@@ -432,10 +444,13 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    if (dtset%rdmft_restart == 1) call read_occ_file(nf,ints%comp_of,offset,orbs%nband(:,1),n0)
 
    call optimize_occupations(n0,eopt,conv,niter,.true.)
-   write(msg,'(2a,a,i0,a,l1,3a,es22.14,a,es22.14,a,es10.2,a)') ch10,' RDMFT: occupation numbers optimized for the ',&
-     'functional ',dtset%rdmft_functional,' (converged = ',conv,')',ch10,&
-     ' RDMFT: optimized total energy         = ',eopt+e_ewald+e_corepsp,&
-     '; energy with the ground-state occupations = ',etot,'  (optimized - ground state =',eopt+e_ewald+e_corepsp-etot,')'
+   write(msg,'(2a,i0,a,l1,a)') ch10,' RDMFT: occupation numbers optimized for the functional ',dtset%rdmft_functional,&
+     ' (converged = ',conv,')'
+   call wrtout([ab_out,std_out],msg)
+   write(eline(1),'(a,t52,a,es22.14)') ' RDMFT: optimized total energy',' = ',eopt+e_ewald+e_corepsp
+   write(eline(2),'(a,t52,a,es22.14)') ' RDMFT: energy with the ground-state occupations',' = ',etot
+   write(eline(3),'(a,t52,a,es22.14)') ' RDMFT: optimized - ground state',' = ',eopt+e_ewald+e_corepsp-etot
+   write(msg,'(3a)') trim(eline(1))//ch10,trim(eline(2))//ch10,trim(eline(3))
    call wrtout([ab_out,std_out],msg)
    write(msg,'(a,i0,a,es14.6)') ' RDMFT: number of iterations = ',niter,'; sum of the occupations of the free orbitals = ',&
      sum(nopt)
@@ -448,15 +463,12 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      eopt = energy_rot(orbs,h1c)-e_ewald-e_corepsp
    end if
 
-   write(msg,'(a)') ' RDMFT: occupation numbers of the first k-point (band, energy, n):'
-   call wrtout([ab_out,std_out],msg)
-   do ib=1,orbs%nband(1,1)
-     write(msg,'(i6,f14.6,f16.10)') ib,eigc(offset(1)+ib),nfull(offset(1)+ib)
-     call wrtout([ab_out,std_out],msg)
-   end do
+   call print_occupations()
+   call print_final_energies()
    if (xmpi_comm_rank(xmpi_world) == master) call write_occ_file(trim(dtfil%filnam_ds(4))//'_RDMFT_OCC')
    if (dtset%rdmft_check_rot > 0) call check_rotations(eopt+e_ewald+e_corepsp)
    ABI_FREE(nfull)
+   ABI_FREE(rho_ref)
    ABI_FREE(n0)
    ABI_FREE(nopt)
  end if
@@ -483,6 +495,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  call table%free()
  call ints%free()
  call pawfgr_destroy(pawfgr)
+ call destroy_mpi_enreg(mpi_seq)
  call orbs%free()
 
 contains
@@ -494,6 +507,11 @@ contains
    logical,intent(out) :: conv_out
    integer,intent(out) :: nit_out
    logical,intent(in) :: talkative
+   logical :: done
+   if (is_jk .and. dtset%rdmft_occ_skip > zero) then
+     call optimize_occ_guarded(nstart,e_out,conv_out,nit_out,talkative,done)
+     if (done) return
+   end if
    if (is_jk) then
      call rdmft_optimize_jk(dtset%rdmft_functional,orbs%nkpt,nf,h1f,ints%jint,ints%kint,alpha,partf,nstart,ntarget,&
                             dtset%rdmft_occ_min,&
@@ -504,6 +522,190 @@ contains
                               nopt,e_out,conv_out,nit_out,verbose=talkative,e_shift=e_ewald+e_corepsp)
    end if
  end subroutine optimize_occupations
+
+ subroutine optimize_occ_guarded(nstart,e_out,conv_out,nit_out,talkative,done)
+   ! Optimization of the occupations of the JK-only functionals with the (almost) empty orbitals held at the lower bound:
+   ! an orbital is fixed if its couplings in the energy are below rdmft_occ_skip and its occupation is at the lower bound.
+   ! The solution is accepted only if the exact gradient of the full energy satisfies the Karush-Kuhn-Tucker conditions
+   ! for all the fixed orbitals (dE/dn_p - mu > 0, mu = multiplier of the electron count, from the orbitals that are in
+   ! the interior of the box); the orbitals that violate them are freed and the problem is solved again. If it cannot
+   ! be decided, done = .false. and the full problem is solved.
+   real(dp),intent(in) :: nstart(:)
+   real(dp),intent(out) :: e_out
+   logical,intent(out) :: conv_out,done
+   integer,intent(out) :: nit_out
+   logical,intent(in) :: talkative
+   integer :: ib2,jf,jk2,nb2,nfix,nr,nviol,r,round,it2
+   real(dp) :: lb,mu,ntr,spread,gmin,er
+   logical :: convr
+   logical,allocatable :: atub(:),fixed(:),interior(:),newfree(:),relc(:)
+   integer,allocatable :: idxr(:),posr(:),partr(:)
+   real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:),nsave(:),gorb(:),h1r(:),jr(:,:),kr(:,:),bjr(:),bkr(:),n0r(:),nrout(:)
+   done = .false.
+   conv_out = .false.
+   nit_out = 0
+   e_out = zero
+   lb = dtset%rdmft_occ_min
+   ! Relevance of each orbital at the starting occupations: its largest coupling coefficient
+   ABI_MALLOC(nsave,(nbk))
+   ABI_MALLOC(relc,(nbk))
+   nsave = nfull
+   nfull = zero
+   where (bg) nfull = one
+   do jf=1,nf
+     nfull(ints%comp_of(jf)) = min(one-lb,max(lb,nstart(jf)))
+   end do
+   do jk2=1,orbs%nkpt
+     nb2 = orbs%nband(jk2,1)
+     ABI_MALLOC(acf,(nb2,nbk))
+     ABI_MALLOC(ccf,(nb2,nbk))
+     ABI_MALLOC(nux,(nb2))
+     call build_coefs(jk2,acf,ccf,nux)
+     do ib2=1,nb2
+       relc(offset(jk2)+ib2) = (nk2*max(maxval(abs(acf(ib2,:))),maxval(abs(ccf(ib2,:)))) >= dtset%rdmft_occ_skip)
+     end do
+     ABI_FREE(acf)
+     ABI_FREE(ccf)
+     ABI_FREE(nux)
+   end do
+   nfull = nsave
+   ABI_FREE(nsave)
+   ABI_MALLOC(fixed,(nf))
+   do jf=1,nf
+     fixed(jf) = (.not.relc(ints%comp_of(jf))) .and. (nstart(jf) <= max(ten*lb,tol14))
+   end do
+   ABI_FREE(relc)
+   ! the time-reversed partners are fixed together
+   do jf=1,nf
+     if (fixed(jf) .and. .not.fixed(partf(jf))) fixed(jf) = .false.
+   end do
+   do jf=1,nf
+     if (fixed(jf) .and. .not.fixed(partf(jf))) fixed(jf) = .false.
+   end do
+   if (count(fixed) < max(10,nf/10)) then
+     ABI_FREE(fixed)
+     return
+   end if
+   ABI_MALLOC(gorb,(nf))
+   ABI_MALLOC(posr,(nf))
+   ABI_MALLOC(newfree,(nf))
+   gmin = zero
+   spread = zero
+   mu = zero
+   do round=1,10
+     nfix = count(fixed)
+     nr = nf-nfix
+     ABI_MALLOC(idxr,(nr))
+     r = 0
+     posr = 0
+     do jf=1,nf
+       if (.not.fixed(jf)) then
+         r = r+1
+         idxr(r) = jf
+         posr(jf) = r
+       end if
+     end do
+     ABI_MALLOC(partr,(nr))
+     ABI_MALLOC(h1r,(nr))
+     ABI_MALLOC(jr,(nr,nr))
+     ABI_MALLOC(kr,(nr,nr))
+     ABI_MALLOC(bjr,(nr))
+     ABI_MALLOC(bkr,(nr))
+     ABI_MALLOC(n0r,(nr))
+     ABI_MALLOC(nrout,(nr))
+     do r=1,nr
+       jf = idxr(r)
+       partr(r) = posr(partf(jf))
+       h1r(r) = h1f(jf)
+       bjr(r) = ints%bj(jf)
+       bkr(r) = ints%bk(jf)
+       n0r(r) = nstart(jf)
+     end do
+     do r=1,nr
+       jr(:,r) = ints%jint(idxr,idxr(r))
+       kr(:,r) = ints%kint(idxr,idxr(r))
+     end do
+     ntr = ntarget-lb*real(nfix,dp)
+     call rdmft_optimize_jk(dtset%rdmft_functional,orbs%nkpt,nr,h1r,jr,kr,alpha,partr,n0r,ntr,lb,bjr,bkr,bgt,nrout,er,&
+                            convr,it2,verbose=talkative,e_shift=e_ewald+e_corepsp)
+     nit_out = nit_out+it2
+     nopt = lb
+     do r=1,nr
+       nopt(idxr(r)) = nrout(r)
+     end do
+     ! KKT conditions of the full problem for the fixed orbitals, with the exact gradient
+     call rdmft_grad_jk(dtset%rdmft_functional,orbs%nkpt,nf,h1f,ints%jint,ints%kint,alpha,nopt,ints%bj,ints%bk,gorb)
+     ABI_MALLOC(interior,(nf))
+     ABI_MALLOC(atub,(nf))
+     interior = .false.
+     atub = .false.
+     do r=1,nr
+       interior(idxr(r)) = (nrout(r) > ten*lb+tol14 .and. nrout(r) < one-ten*lb-tol14)
+       atub(idxr(r)) = (nrout(r) >= one-ten*lb-tol14)
+     end do
+     ABI_FREE(partr)
+     ABI_FREE(h1r)
+     ABI_FREE(jr)
+     ABI_FREE(kr)
+     ABI_FREE(bjr)
+     ABI_FREE(bkr)
+     ABI_FREE(n0r)
+     ABI_FREE(nrout)
+     ABI_FREE(idxr)
+     ! Lower end of the multiplier of the electron count: the largest dE/dn of the orbitals that are in the interior of the
+     ! box (they all must have dE/dn = mu) or at the upper bound (dE/dn <= mu)
+     if (count(interior .or. atub) == 0) then
+       ABI_FREE(interior)
+       ABI_FREE(atub)
+       exit
+     end if
+     if (count(interior) > 0) then
+       mu = sum(gorb,mask=interior)/real(count(interior),dp)
+       spread = maxval(abs(gorb-mu),mask=interior)
+     else
+       mu = maxval(gorb,mask=atub)
+       spread = zero
+     end if
+     if (spread > 1.0e-6_dp .or. maxval(gorb,mask=(interior .or. atub)) > mu+1.0e-6_dp) then
+       ABI_FREE(interior)
+       ABI_FREE(atub)
+       exit
+     end if
+     newfree = fixed .and. (gorb-mu < 1.0e-9_dp)
+     nviol = count(newfree)
+     gmin = minval(gorb-mu,mask=fixed)
+     ABI_FREE(interior)
+     ABI_FREE(atub)
+     if (nviol == 0) then
+       done = .true.
+       exit
+     end if
+     fixed = fixed .and. .not.newfree
+     do jf=1,nf
+       if (fixed(jf) .and. .not.fixed(partf(jf))) fixed(jf) = .false.
+     end do
+     if (count(fixed) < max(10,nf/10)) exit
+   end do
+   if (done) then
+     conv_out = convr
+     e_out = rdmft_energy_jk(dtset%rdmft_functional,orbs%nkpt,nf,nopt,h1f,ints%jint,ints%kint,alpha,ints%bj,ints%bk,bgt)
+     if (talkative) then
+       write(msg,'(a,i0,a,i0,2a,es10.2,a,es10.2,a)') ' RDMFT: occupations optimized for ',nf-count(fixed),' of ',nf,&
+         ' free orbitals, the others held at the lower bound (rdmft_occ_skip); KKT check of the fixed orbitals:',&
+         ' min(dE/dn - mu) = ',gmin,', spread of dE/dn of the interior orbitals = ',spread,ch10
+       call wrtout([ab_out,std_out],msg)
+     end if
+   else
+     if (talkative) then
+       write(msg,'(2a)') ' RDMFT: the reduced occupation problem could not be verified; the full problem is solved.',ch10
+       call wrtout([ab_out,std_out],msg)
+     end if
+   end if
+   ABI_FREE(fixed)
+   ABI_FREE(gorb)
+   ABI_FREE(posr)
+   ABI_FREE(newfree)
+ end subroutine optimize_occ_guarded
 
  subroutine assemble_nfull()
    ! Occupations of all the orbitals: background 1, free from the optimization, frozen virtual 0
@@ -586,6 +788,94 @@ contains
    ABI_FREE(ek2)
    ABI_FREE(hm2)
  end subroutine check_h
+
+ function kinetic_cur() result(t)
+   ! Kinetic energy per cell of the current orbitals and occupations nfull: sum_kn 2 w_k n_kn <kn|T|kn>, T diagonal in G
+   real(dp) :: t
+   integer :: jk,jb,ig
+   real(dp) :: kg(3),tk
+   t = zero
+   do jk=1,orbs%nkpt
+     do jb=1,orbs%nband(jk,1)
+       if (nfull(offset(jk)+jb) < tol14) cycle
+       tk = zero
+       do ig=1,orbs%npw(jk)
+         kg(:) = orbs%kpt(:,jk)+real(orbs%kg(:,ig,jk),dp)
+         tk = tk+(orbs%cg(1,ig,jb,jk,1)**2+orbs%cg(2,ig,jb,jk,1)**2)*dot_product(kg,matmul(orbs%gmet,kg))
+       end do
+       t = t+two*orbs%wtk(jk)*nfull(offset(jk)+jb)*two*pi**2*tk
+     end do
+   end do
+ end function kinetic_cur
+
+ function energy_with(jm,km,bjv,bkv,bgx) result(e)
+   ! Electronic energy of the functional with the given integrals (zero them to isolate a term): the energy is linear in J and K
+   real(dp),intent(in) :: jm(:,:),km(:,:),bjv(:),bkv(:)
+   type(rdmft_bg_t),intent(in) :: bgx
+   real(dp) :: e
+   integer :: jf
+   real(dp),allocatable :: nx(:)
+   ABI_MALLOC(nx,(nf))
+   do jf=1,nf
+     nx(jf) = nfull(ints%comp_of(jf))
+   end do
+   if (is_jk) then
+     e = rdmft_energy_jk(dtset%rdmft_functional,orbs%nkpt,nf,nx,h1f,jm,km,alpha,bjv,bkv,bgx)
+   else
+     e = rdmft_energy_pnof(dtset%rdmft_functional,table,orbs%nkpt,nf,nx,h1f,jm,km,dtset%rdmft_selfint,bjv,bkv,bgx)
+   end if
+   ABI_FREE(nx)
+ end function energy_with
+
+ subroutine print_final_energies()
+   ! Energy components of the optimized state next to those of the starting state (SD with the ground-state occupations)
+   real(dp) :: ef(7),es(7),base,eh,ex,e1,esum
+   real(dp),allocatable :: zm(:,:),zv(:)
+   type(rdmft_bg_t) :: b0,bjt,bkt
+   integer :: ic
+   character(len=100) :: lbl(7)
+   ABI_MALLOC(zm,(nf,nf))
+   ABI_MALLOC(zv,(nf))
+   zm = zero
+   zv = zero
+   b0 = bgt
+   b0%sjo = zero; b0%sko = zero; b0%sjd = zero; b0%skd = zero
+   bjt = bgt
+   bjt%sko = zero; bjt%skd = zero
+   bkt = bgt
+   bkt%sjo = zero; bkt%sjd = zero
+   base = energy_with(zm,zm,zv,zv,b0)
+   eh = energy_with(ints%jint,zm,ints%bj,zv,bjt)-base
+   ex = energy_with(zm,ints%kint,zv,ints%bk,bkt)-base
+   e1 = base
+   ef(1) = kinetic_cur()
+   ef(2) = e1
+   ef(3) = eh
+   ef(4) = ex
+   ef(5) = e_ewald
+   ef(6) = e_corepsp
+   ef(7) = e1+eh+ex+e_ewald+e_corepsp
+   esum = ef(7)-energy_cur()
+   es = [ekin_tot,eone,ehartree,eexch,e_ewald,e_corepsp,etot]
+   lbl(1) = ' RDMFT: kinetic energy'
+   lbl(2) = ' RDMFT: one-electron energy (T + Vloc + Vnl)'
+   lbl(3) = ' RDMFT: Hartree energy'
+   lbl(4) = ' RDMFT: exchange (functional) energy'
+   lbl(5) = ' RDMFT: Ewald energy'
+   lbl(6) = ' RDMFT: core pseudopotential energy'
+   lbl(7) = ' RDMFT: total energy'
+   write(msg,'(3a)') ch10,' RDMFT: energy components (Ha) of the optimized state, and change with respect to the starting',&
+     ' state (SD, ground-state occupations)'
+   call wrtout([ab_out,std_out],msg)
+   do ic=1,7
+     write(msg,'(a,t47,2es22.14)') trim(lbl(ic)),ef(ic),ef(ic)-es(ic)
+     call wrtout([ab_out,std_out],msg)
+   end do
+   write(msg,'(a,t47,es22.14,a)') ' RDMFT: sum of the components - total energy',esum,ch10
+   call wrtout([ab_out,std_out],msg)
+   ABI_FREE(zm)
+   ABI_FREE(zv)
+ end subroutine print_final_energies
 
  function energy_cur() result(e)
    ! Total energy at the occupations nfull for the current integrals, one-electron elements and background sums
@@ -871,7 +1161,9 @@ contains
      end if
      e_old = e_new
    end do
-   write(msg,'(a,i0,a,es22.14,a)') ' RDMFT: orbital optimization finished after ',mi,' macro-iterations, E = ',e_old,ch10
+   write(msg,'(a,i0,a)') ' RDMFT: orbital optimization finished after ',mi,' macro-iterations'
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(a,t52,a,es22.14,a)') ' RDMFT: total energy after the orbital optimization',' = ',e_old,ch10
    call wrtout([ab_out,std_out],msg)
    write(msg,'(a,5(a,f9.2))') ' RDMFT: timings (s):',' ints+Fock exchange =',tm(1),', energy =',tm(2),', Hartree Fock =',tm(3),&
      ', rotation =',tm(4),', occupations =',tm(5)
@@ -886,6 +1178,77 @@ contains
    ABI_FREE(h1c_b)
    ABI_FREE(hmat_b)
  end subroutine orbital_macro
+
+ subroutine compute_density(occ_all,rho)
+   ! Electron density rho(r) = 2 sum_k w_k sum_n n_kn |u_kn(r)|^2 / Omega (electrons/bohr^3) on the dense FFT mesh,
+   ! with n_kn the occupations per spin (between 0 and 1) of the composite index offset(k)+n
+   real(dp),intent(in) :: occ_all(:)
+   real(dp),intent(out) :: rho(:)
+   integer :: jk,jb
+   real(dp),allocatable :: ur(:,:)
+   ABI_MALLOC(ur,(2,nfftf))
+   rho = zero
+   do jk=1,orbs%nkpt
+     do jb=1,orbs%nband(jk,1)
+       if (occ_all(offset(jk)+jb) < tol14) cycle
+       call orb_to_real_one(orbs,jk,jb,ngfftf,mpi_seq,ur)
+       rho(:) = rho(:)+two*orbs%wtk(jk)*occ_all(offset(jk)+jb)*(ur(1,:)**2+ur(2,:)**2)/orbs%ucvol
+     end do
+   end do
+   ABI_FREE(ur)
+ end subroutine compute_density
+
+ subroutine print_occupations()
+   ! Optimized occupation numbers k-point by k-point (spin summed, as in the GW natural orbitals), the electron count and the
+   ! integrated density
+   integer :: jk,jb,nb2,m,ncomp(3)
+   real(dp) :: tk,tot,dv,drho,qint,rmax,rmin,idem
+   real(dp),allocatable :: rho_end(:)
+   character(len=100) :: ln(8)
+   write(msg,'(2a)') ch10,' RDMFT: optimized occupation numbers (spin summed, between 0 and 2), k-point by k-point:'
+   call wrtout([ab_out,std_out],msg)
+   tot = zero
+   idem = zero
+   do jk=1,orbs%nkpt
+     nb2 = orbs%nband(jk,1)
+     write(msg,'(a,3f10.5)') ' Occupations at the k-point (reduced coordinates): ',orbs%kpt(:,jk)
+     call wrtout([ab_out,std_out],msg)
+     do jb=1,nb2,10
+       m = min(10,nb2-jb+1)
+       write(msg,'(f11.5,*(f10.5))') two*nfull(offset(jk)+jb:offset(jk)+jb+m-1)
+       call wrtout([ab_out,std_out],msg)
+     end do
+     tk = two*sum(nfull(offset(jk)+1:offset(jk)+nb2))
+     tot = tot+orbs%wtk(jk)*tk
+     idem = idem+orbs%wtk(jk)*sum(nfull(offset(jk)+1:offset(jk)+nb2)*(one-nfull(offset(jk)+1:offset(jk)+nb2)))
+     write(msg,'(a22,i5,a3,i5,a21,f10.5,a)') ' Total occ. from band ',1,' to',nb2,' at current k-point: ',tk,ch10
+     call wrtout([ab_out,std_out],msg)
+   end do
+   ! Electron density of the natural orbitals: integral, change with respect to the ground state, extrema
+   ABI_MALLOC(rho_end,(nfftf))
+   call compute_density(nfull,rho_end)
+   dv = orbs%ucvol/real(nfftf,dp)
+   qint = sum(rho_end)*dv
+   drho = sum(abs(rho_end-rho_ref))*dv
+   rmax = maxval(rho_end)
+   rmin = minval(rho_end)
+   ABI_FREE(rho_end)
+   ncomp(1) = count(nfull > one-1.0e-6_dp)
+   ncomp(3) = count(nfull < 1.0e-6_dp)
+   ncomp(2) = nbk-ncomp(1)-ncomp(3)
+   write(ln(1),'(a,t52,a,f22.10)') ' RDMFT: total averaged occupation, all k-points',' = ',tot
+   write(ln(2),'(a,t52,a,f22.10)') ' RDMFT: number of electrons (nelect)',' = ',orbs%nelect
+   write(ln(3),'(a,t52,a,f22.10)') ' RDMFT: integrated electron density',' = ',qint
+   write(ln(4),'(a,t52,a,f22.10)') ' RDMFT: integral of |rho - rho(ground state)|',' = ',drho
+   write(ln(5),'(a,t52,a,es22.10)') ' RDMFT: maximum of the density (e/bohr^3)',' = ',rmax
+   write(ln(6),'(a,t52,a,es22.10)') ' RDMFT: minimum of the density (e/bohr^3)',' = ',rmin
+   write(ln(7),'(a,t52,a,es22.10)') ' RDMFT: sum_p n_p (1 - n_p), 0 for one determinant',' = ',idem
+   write(ln(8),'(a,t52,a,3(i0,1x))') ' RDMFT: orbitals with n=1 / fractional / n=0',' = ',ncomp
+   write(msg,'(4a)') trim(ln(1))//ch10,trim(ln(2))//ch10,trim(ln(3))//ch10,trim(ln(4))
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(4a)') trim(ln(5))//ch10,trim(ln(6))//ch10,trim(ln(7))//ch10,trim(ln(8))
+   call wrtout([ab_out,std_out],msg)
+ end subroutine print_occupations
 
  function diag_sum() result(dsum)
    ! Sum over the occupied orbitals of K_pp - J_pp (free and background)
