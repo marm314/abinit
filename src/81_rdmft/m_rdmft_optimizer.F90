@@ -53,7 +53,7 @@ contains
 !!  solve_dense
 !!
 !! FUNCTION
-!!  Solve the dense linear system a x = b by Gaussian elimination with partial pivoting.
+!!  Solve the dense linear system a x = b by an LU factorization with partial pivoting (LAPACK dgetrf).
 !!
 !! OUTPUT
 !!  ok = false if the matrix is numerically singular
@@ -71,55 +71,50 @@ subroutine solve_dense(n,a,b,x,ok)
 
  !Local variables-------------------------------
  !scalars
- integer :: i,ip,k
- real(dp) :: amax,fac
+ integer :: i,info,k
+ real(dp) :: tmp
  !arrays
- real(dp),allocatable :: aa(:,:),bb(:),colscale(:),row(:)
+ integer,allocatable :: ipiv(:)
+ real(dp),allocatable :: aa(:,:),colscale(:)
 
 ! *************************************************************************
 
  ABI_MALLOC(aa,(n,n))
- ABI_MALLOC(bb,(n))
- ABI_MALLOC(row,(n))
+ ABI_MALLOC(ipiv,(n))
  ABI_MALLOC(colscale,(n))
  aa = a
- bb = b
+ x = b
  ok = .true.
- ! Each pivot is compared with the scale of its own column (the entries of a KKT matrix differ by many orders)
+ ! LU factorization with partial pivoting (LAPACK). Each pivot (diagonal of U) is compared with the scale of its own
+ ! column (the entries of a KKT matrix differ by many orders)
  do k=1,n
    colscale(k) = max(maxval(abs(a(:,k))),tiny(one))
  end do
- do k=1,n
-   ip = k
-   amax = abs(aa(k,k))
-   do i=k+1,n
-     if (abs(aa(i,k)) > amax) then
-       amax = abs(aa(i,k)); ip = i
+ call dgetrf(n,n,aa,n,ipiv,info)
+ if (info /= 0) ok = .false.
+ if (ok) then
+   do k=1,n
+     tmp = abs(aa(k,k))
+     if (tmp <= 1.0e-14_dp*colscale(k) .or. tmp /= tmp) then
+       ok = .false.
+       exit
      end if
    end do
-   if (amax <= 1.0e-14_dp*colscale(k) .or. amax /= amax) then
-     ok = .false.
-     exit
-   end if
-   if (ip /= k) then
-     row = aa(k,:); aa(k,:) = aa(ip,:); aa(ip,:) = row
-     fac = bb(k); bb(k) = bb(ip); bb(ip) = fac
-   end if
-   do i=k+1,n
-     fac = aa(i,k)/aa(k,k)
-     aa(i,k:n) = aa(i,k:n)-fac*aa(k,k:n)
-     bb(i) = bb(i)-fac*bb(k)
-   end do
- end do
- x = zero
+ end if
  if (ok) then
-   do k=n,1,-1
-     x(k) = (bb(k)-sum(aa(k,k+1:n)*x(k+1:n)))/aa(k,k)
+   ! P b, then L y = Pb (unit lower), then U x = y
+   do i=1,n
+     if (ipiv(i) /= i) then
+       tmp = x(i); x(i) = x(ipiv(i)); x(ipiv(i)) = tmp
+     end if
    end do
+   call dtrsv('L','N','U',n,aa,n,x,1)
+   call dtrsv('U','N','N',n,aa,n,x,1)
+ else
+   x = zero
  end if
  ABI_FREE(aa)
- ABI_FREE(bb)
- ABI_FREE(row)
+ ABI_FREE(ipiv)
  ABI_FREE(colscale)
 
 end subroutine solve_dense

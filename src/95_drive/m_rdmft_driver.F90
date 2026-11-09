@@ -125,7 +125,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  real(dp),allocatable :: eigc(:),eigf(:),ekin(:,:),h1c(:),h1diag(:,:),h1f(:),n0(:),nc(:),nfull(:),nf_gs(:),nopt(:)
  complex(dpc),allocatable :: hmat(:,:,:)
  logical,allocatable :: actc(:),bg(:),free(:),occd(:),occf(:)
- real(dp) :: tm(8),t0,tint_max(6),tint_min(6),t_start
+ real(dp) :: tm(8),t0,tint_max(6),tint_min(6),t_start,tst(7)
  integer :: nrel_last
 
 ! *************************************************************************
@@ -135,6 +135,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  tm = zero
  rdmft_tint = zero
  t_start = abi_wtime()
+ tst = zero
  is_jk = (dtset%rdmft_functional >= RDMFT_SD .and. dtset%rdmft_functional <= RDMFT_MULLER_AS)
  is_pnof = (dtset%rdmft_functional >= RDMFT_PNOF5 .and. dtset%rdmft_functional <= RDMFT_GNOF)
 
@@ -152,6 +153,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
 
  !Read the orbitals
  call orbs%read_wfk(wfk_path)
+ tst(1) = abi_wtime()-t_start
  !The plane-wave basis of the orbitals is the one of the ground-state calculation: ecut must be the same
  if (abs(orbs%ecut-dtset%ecut) > tol8) then
    write(msg,'(2(a,es14.6),3a)') 'RDMFT: ecut = ',dtset%ecut,' in the RDMFT dataset but ',orbs%ecut,&
@@ -219,6 +221,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    call wrtout([ab_out,std_out],msg)
  end if
  nk2 = real(orbs%nkpt,dp)**2
+ tst(2) = abi_wtime()-t_start
 
  !FFT mesh and G^2 cut-off containing the products of two orbitals (same as for the density)
  call pawfgr_init(pawfgr,dtset,mgfftf,nfftf,ecut_eff,ecutdg_eff,ngfftc,ngfftf, &
@@ -329,8 +332,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ! ------------------------------------------------------------------
  ! J and K integrals in the active space
  ! ------------------------------------------------------------------
+ tst(3) = abi_wtime()-t_start
  call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
                    dtset%rdmft_core_ints == 1,reduce=(dtset%rdmft_tr_reduce == 1))
+ tst(4) = abi_wtime()-t_start
  nf = ints%nfree
  ABI_MALLOC(nf_gs,(nf))
  ABI_MALLOC(h1f,(nf))
@@ -454,6 +459,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    if (dtset%rdmft_restart == 1) call read_occ_file(nf,ints%comp_of,offset,orbs%nband(:,1),n0)
 
    call optimize_occupations(n0,eopt,conv,niter,.true.)
+   tst(5) = abi_wtime()-t_start
    write(msg,'(2a,i0,a,l1,a)') ch10,' RDMFT: occupation numbers optimized for the functional ',dtset%rdmft_functional,&
      ' (converged = ',conv,')'
    call wrtout([ab_out,std_out],msg)
@@ -470,11 +476,16 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ! Optimization of the orbitals (ADAM) alternated with the one of the occupations
    if (dtset%rdmft_orb_macro > 0) then
      call orbital_macro(eopt+e_ewald+e_corepsp)
+     tst(6) = abi_wtime()-t_start
      eopt = energy_rot(orbs,h1c)-e_ewald-e_corepsp
    end if
 
    call print_occupations()
    call print_final_energies()
+   tst(7) = abi_wtime()-t_start
+   write(msg,'(a,7f9.2)') ' RDMFT: elapsed (s) after read WFK / completion+TR / orbital setup / integrals / first occupations'//&
+     ' / orbital macro / output =',tst
+   call wrtout([ab_out,std_out],msg)
    if (xmpi_comm_rank(xmpi_world) == master) call write_occ_file(trim(dtfil%filnam_ds(4))//'_RDMFT_OCC')
    if (dtset%rdmft_check_rot > 0) call check_rotations(eopt+e_ewald+e_corepsp)
    ABI_FREE(nfull)
