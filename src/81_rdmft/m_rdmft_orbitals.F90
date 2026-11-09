@@ -134,6 +134,8 @@ module m_rdmft_orbitals
    ! Find the k-point -k of every k-point of the mesh.
 
    procedure :: complete_time_reversal => rdmft_orbs_complete_time_reversal
+   procedure :: align_time_reversal => rdmft_orbs_align_time_reversal
+   procedure :: complete_basis => rdmft_orbs_complete_basis
    ! Add the missing -k points, with the time-reversed orbitals.
 
    procedure :: rotate_pair => rdmft_orbs_rotate_pair
@@ -349,6 +351,237 @@ subroutine rdmft_orbs_find_tr_partners(orbs)
  end do
 
 end subroutine rdmft_orbs_find_tr_partners
+!!***
+
+!!****f* m_rdmft_orbitals/rdmft_orbs_complete_basis
+!! NAME
+!!  rdmft_orbs_complete_basis
+!!
+!! FUNCTION
+!!  Complete the set of bands of every k-point to all its plane waves (nband = npw): the bands read are kept, and the
+!!  others are orthonormal vectors of the orthogonal complement, built from plane waves with a pivoted Gram-Schmidt
+!!  procedure (largest residual first). The added bands have occupation 0 and an arbitrary (large) energy.
+!!  This gives a complete basis of rotations of the orbitals, to test the optimization of the orbitals against the
+!!  basis-set limit (for example, that the single-determinant functional reaches the Hartree-Fock energy).
+!!
+!! OUTPUT
+!!  nadded = total number of bands added
+!!
+!! SOURCE
+subroutine rdmft_orbs_complete_basis(orbs,nadded)
+
+ !Arguments ------------------------------------
+ !scalars
+ class(rdmft_orbs_t),intent(inout) :: orbs
+ integer,intent(out) :: nadded
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ib,ig,ii,ik,ipiv,mnew,np,nb,pass
+ real(dp) :: nrm
+ complex(dpc) :: ov
+ !arrays
+ integer :: ipv(1)
+ real(dp),allocatable :: cg(:,:,:,:,:),dres(:),eig(:,:,:),occ(:,:,:)
+ complex(dpc),allocatable :: vec(:)
+
+! *************************************************************************
+
+ nadded = 0
+ if (orbs%nspinor /= 1 .or. orbs%nsppol /= 1) then
+   ABI_ERROR('RDMFT: rdmft_complete needs nsppol = 1 and nspinor = 1.')
+ end if
+ mnew = maxval(orbs%npw)
+ ABI_MALLOC(cg,(2,orbs%mpw,mnew,orbs%nkpt,1))
+ ABI_MALLOC(eig,(mnew,orbs%nkpt,1))
+ ABI_MALLOC(occ,(mnew,orbs%nkpt,1))
+ cg = zero
+ eig = zero
+ occ = zero
+ ABI_MALLOC(vec,(orbs%mpw))
+ ABI_MALLOC(dres,(orbs%mpw))
+ do ik=1,orbs%nkpt
+   nb = orbs%nband(ik,1)
+   np = orbs%npw(ik)
+   cg(:,:,1:nb,ik,1) = orbs%cg(:,:,1:nb,ik,1)
+   eig(1:nb,ik,1) = orbs%eig(1:nb,ik,1)
+   occ(1:nb,ik,1) = orbs%occ(1:nb,ik,1)
+   do ig=1,np
+     dres(ig) = one-sum(cg(1,ig,1:nb,ik,1)**2+cg(2,ig,1:nb,ik,1)**2)
+   end do
+   do ii=nb+1,np
+     ipv = maxloc(dres(1:np))
+     ipiv = ipv(1)
+     vec = czero
+     vec(ipiv) = cone
+     do pass=1,2
+       do ib=1,ii-1
+         ov = czero
+         do ig=1,np
+           ov = ov+cmplx(cg(1,ig,ib,ik,1),-cg(2,ig,ib,ik,1),kind=dpc)*vec(ig)
+         end do
+         do ig=1,np
+           vec(ig) = vec(ig)-ov*cmplx(cg(1,ig,ib,ik,1),cg(2,ig,ib,ik,1),kind=dpc)
+         end do
+       end do
+     end do
+     nrm = sqrt(sum(real(vec(1:np))**2+aimag(vec(1:np))**2))
+     vec(1:np) = vec(1:np)/nrm
+     cg(1,1:np,ii,ik,1) = real(vec(1:np),dp)
+     cg(2,1:np,ii,ik,1) = aimag(vec(1:np))
+     dres(1:np) = dres(1:np)-(real(vec(1:np))**2+aimag(vec(1:np))**2)
+     eig(ii,ik,1) = 100.0_dp
+     nadded = nadded+1
+   end do
+   orbs%nband(ik,1) = np
+ end do
+ ABI_FREE(vec)
+ ABI_FREE(dres)
+ call move_alloc(cg,orbs%cg)
+ call move_alloc(eig,orbs%eig)
+ call move_alloc(occ,orbs%occ)
+ orbs%mband = mnew
+
+end subroutine rdmft_orbs_complete_basis
+!!***
+
+!!****f* m_rdmft_orbitals/rdmft_orbs_align_time_reversal
+!! NAME
+!!  rdmft_orbs_align_time_reversal
+!!
+!! FUNCTION
+!!  For every pair (k,-k) of the mesh, replace the orbitals of the k-point with the larger index by the time-reversed
+!!  orbitals of the other one, c_{n,-k}(G) = conjg(c_{n,k}(-G)), and its eigenvalues by the ones of k. This fixes the
+!!  arbitrary choice of the orbitals within degenerate shells at -k made by the diagonalization, which would break the
+!!  band-by-band correspondence assumed by the rotations (conjugate matrix at -k) and by the ties of the occupations.
+!!
+!! OUTPUT
+!!  naligned = number of k-points whose orbitals were replaced
+!!
+!! SOURCE
+subroutine rdmft_orbs_align_time_reversal(orbs,naligned)
+
+ !Arguments ------------------------------------
+ !scalars
+ class(rdmft_orbs_t),intent(inout) :: orbs
+ integer,intent(out) :: naligned
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: ib,ie,ig,ik,ish,jb,jk,kb,mg,nacc,nb,ng1,key,m
+ integer :: rr(3)
+ real(dp) :: nrm
+ complex(dpc),allocatable :: cand(:,:),acc(:,:)
+ integer,allocatable :: pidx(:)
+ !arrays
+ integer,allocatable :: lookup(:)
+
+! *************************************************************************
+
+ naligned = 0
+ mg = max(maxval(abs(orbs%kg)),1)+2
+ ng1 = 2*mg+1
+ ABI_MALLOC(lookup,(ng1**3))
+ do ik=1,orbs%nkpt
+   jk = orbs%tr_k(ik)
+   if (jk <= ik) cycle
+   if (orbs%npw(jk) /= orbs%npw(ik) .or. any(orbs%nband(jk,:) /= orbs%nband(ik,:))) cycle
+   ! k_jk = -k_ik + rr: the vector G' of -k corresponds to G = -G' - rr of k
+   rr = nint(orbs%kpt(:,ik)+orbs%kpt(:,jk))
+   ! position of each vector G of the k-point ik
+   lookup = 0
+   do ig=1,orbs%npw(ik)
+     key = 1+(orbs%kg(1,ig,ik)+mg)+ng1*((orbs%kg(2,ig,ik)+mg)+ng1*(orbs%kg(3,ig,ik)+mg))
+     lookup(key) = ig
+   end do
+   nb = orbs%nband(ik,1)
+   do ig=1,orbs%npw(jk)
+     key = 1+(-orbs%kg(1,ig,jk)-rr(1)+mg)+ng1*((-orbs%kg(2,ig,jk)-rr(2)+mg)+ng1*(-orbs%kg(3,ig,jk)-rr(3)+mg))
+     if (lookup(key) == 0) then
+       ABI_ERROR('RDMFT: the plane-wave sets at k and -k are not related by G -> -G.')
+     end if
+   end do
+   do ig=1,orbs%npw(jk)
+     key = 1+(-orbs%kg(1,ig,jk)-rr(1)+mg)+ng1*((-orbs%kg(2,ig,jk)-rr(2)+mg)+ng1*(-orbs%kg(3,ig,jk)-rr(3)+mg))
+     do ib=1,nb
+       orbs%cg(1,ig,ib,jk,1) = orbs%cg(1,lookup(key),ib,ik,1)
+       orbs%cg(2,ig,ib,jk,1) = -orbs%cg(2,lookup(key),ib,ik,1)
+     end do
+   end do
+   orbs%eig(1:nb,jk,1) = orbs%eig(1:nb,ik,1)
+   naligned = naligned+1
+ end do
+
+ ! Time-reversal-invariant k-points (k = -k + G): the rotations are real there, so the bands must be real functions
+ ! (c(-G-rr) = conjg(c(G))), also inside the degenerate shells: build real orthonormal combinations of each shell
+ do ik=1,orbs%nkpt
+   if (orbs%tr_k(ik) /= ik) cycle
+   nb = orbs%nband(ik,1)
+   rr = nint(orbs%kpt(:,ik)+orbs%kpt(:,ik))
+   lookup = 0
+   do ig=1,orbs%npw(ik)
+     key = 1+(orbs%kg(1,ig,ik)+mg)+ng1*((orbs%kg(2,ig,ik)+mg)+ng1*(orbs%kg(3,ig,ik)+mg))
+     lookup(key) = ig
+   end do
+   ABI_MALLOC(pidx,(orbs%npw(ik)))
+   do ig=1,orbs%npw(ik)
+     key = 1+(-orbs%kg(1,ig,ik)-rr(1)+mg)+ng1*((-orbs%kg(2,ig,ik)-rr(2)+mg)+ng1*(-orbs%kg(3,ig,ik)-rr(3)+mg))
+     pidx(ig) = lookup(key)
+     if (pidx(ig) == 0) then
+       ABI_ERROR('RDMFT: the plane-wave set at a time-reversal-invariant k-point is not symmetric under G -> -G.')
+     end if
+   end do
+   ib = 1
+   do while (ib <= nb)
+     ie = ib
+     do while (ie < nb)
+       if (abs(orbs%eig(ie+1,ik,1)-orbs%eig(ie,ik,1)) > 1.0e-6_dp) exit
+       ie = ie+1
+     end do
+     m = ie-ib+1
+     ABI_MALLOC(cand,(orbs%npw(ik),2*m))
+     ABI_MALLOC(acc,(orbs%npw(ik),m))
+     do jb=ib,ie
+       do ig=1,orbs%npw(ik)
+         cand(ig,2*(jb-ib)+1) = cmplx(orbs%cg(1,ig,jb,ik,1),orbs%cg(2,ig,jb,ik,1),kind=dpc)+ &
+                                cmplx(orbs%cg(1,pidx(ig),jb,ik,1),-orbs%cg(2,pidx(ig),jb,ik,1),kind=dpc)
+         cand(ig,2*(jb-ib)+2) = -cmplx(zero,one,kind=dpc)*(cmplx(orbs%cg(1,ig,jb,ik,1),orbs%cg(2,ig,jb,ik,1),kind=dpc)- &
+                                cmplx(orbs%cg(1,pidx(ig),jb,ik,1),-orbs%cg(2,pidx(ig),jb,ik,1),kind=dpc))
+       end do
+     end do
+     ! real Gram-Schmidt: keep m independent vectors
+     nacc = 0
+     do kb=1,2*m
+       if (nacc == m) exit
+       do ish=1,2
+         do jb=1,nacc
+           nrm = sum(real(conjg(acc(:,jb))*cand(:,kb),dp))
+           cand(:,kb) = cand(:,kb)-nrm*acc(:,jb)
+         end do
+       end do
+       nrm = sqrt(sum(real(cand(:,kb))**2+aimag(cand(:,kb))**2))
+       if (nrm > 1.0e-6_dp) then
+         nacc = nacc+1
+         acc(:,nacc) = cand(:,kb)/nrm
+       end if
+     end do
+     if (nacc /= m) then
+       ABI_ERROR('RDMFT: cannot build a real basis of a degenerate shell at a time-reversal-invariant k-point.')
+     end if
+     do jb=ib,ie
+       orbs%cg(1,1:orbs%npw(ik),jb,ik,1) = real(acc(:,jb-ib+1),dp)
+       orbs%cg(2,1:orbs%npw(ik),jb,ik,1) = aimag(acc(:,jb-ib+1))
+     end do
+     ABI_FREE(cand)
+     ABI_FREE(acc)
+     ib = ie+1
+   end do
+   ABI_FREE(pidx)
+   naligned = naligned+1
+ end do
+ ABI_FREE(lookup)
+
+end subroutine rdmft_orbs_align_time_reversal
 !!***
 
 !!****f* m_rdmft_orbitals/rdmft_orbs_complete_time_reversal
@@ -643,7 +876,7 @@ subroutine rdmft_orbs_tr_alignment(orbs,maxdev,ik_worst,ib_worst)
        ovlp = ovlp+conjg(cmplx(orbs%cg(1,idx,ib,jk,1),orbs%cg(2,idx,ib,jk,1),kind=dpc))* &
                    conjg(cmplx(orbs%cg(1,ig,ib,ik,1),orbs%cg(2,ig,ib,ik,1),kind=dpc))
      end do
-     dev = one-abs(ovlp)
+     dev = one-real(ovlp,dp)
      if (dev > maxdev) then
        maxdev = dev; ik_worst = ik; ib_worst = ib
      end if

@@ -20076,6 +20076,46 @@ Factor that multiplies the ADAM learning rate [[rdmft_adam_lr]] after a run that
 ),
 
 Variable(
+    abivarname="rdmft_complete",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0,
+    mnemonics="Reduced Density Matrix Functional Theory: COMPLETE the plane-wave basis",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+If 1, the set of bands read from the ground-state WFK file is completed, at every k-point, to all its plane waves
+(number of bands = number of plane waves): the added bands are orthonormal to the ones read, have occupation 0, and are
+built from plane waves with a pivoted Gram-Schmidt procedure. The orbital rotations of [[rdmft_orb_macro]] then span the
+whole plane-wave space. It is meant to test the optimization of the orbitals against the basis-set limit: for example,
+the single-determinant functional ([[rdmft_functional]] = 1) started from Kohn-Sham orbitals must reach the
+Hartree-Fock energy. It is only practical for small cells and low [[ecut]].
+""",
+),
+
+Variable(
+    abivarname="rdmft_occ_min",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1.0e-6,
+    mnemonics="Reduced Density Matrix Functional Theory: MINimum OCCupation number",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Occupation numbers (per spin) of the JK-only functionals ([[rdmft_functional]] = 1 to 10) are optimized in the box
+[[rdmft_occ_min]] $\le n \le 1$ - [[rdmft_occ_min]]. The bound avoids the singular derivatives of the functionals with
+square roots at $n=0$, but it also forces every virtual orbital to hold at least that occupation, which raises the energy
+by about (number of virtual orbitals) $\times$ [[rdmft_occ_min]] $\times$ (orbital energy gap). For the single-determinant functional
+([[rdmft_functional]] = 1), whose minimum has integer occupations, a very small value (e.g. 1e-11) should be used to reproduce the
+Hartree-Fock energy.
+""",
+),
+
+Variable(
     abivarname="rdmft_core_ints",
     varset="dev",
     vartype="integer",

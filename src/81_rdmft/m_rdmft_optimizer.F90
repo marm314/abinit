@@ -357,12 +357,14 @@ end subroutine qp_box_eq
 !!
 !! SOURCE
 subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,n0,ntarget,eps,bj,bk,bg,&
-                             nout,energy,converged,niter)
+                             nout,energy,converged,niter,verbose,e_shift)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func,nk,nbk
  real(dp),intent(in) :: alpha,ntarget,eps
+ logical,optional,intent(in) :: verbose
+ real(dp),optional,intent(in) :: e_shift
  type(rdmft_bg_t),intent(in) :: bg
  real(dp),intent(out) :: energy
  logical,intent(out) :: converged
@@ -378,13 +380,23 @@ subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,n0,ntarget,e
  integer :: attempt,iter,ils,ip,is,nv
  real(dp),parameter :: armijo_c1=1.0e-4_dp,step_tol=1.0e-10_dp
  real(dp) :: alph,dirder,f0,lambda,ftrial,headroom_tot,resid,gr,fa,faa,fab,ff,fd,fd1,fd2
- logical :: qp_ok
+ logical :: qp_ok,talk
+ real(dp) :: eshift
  character(len=500) :: msg
  !arrays
  integer,allocatable :: var_of(:)
  real(dp),allocatable :: aeq(:),bmat(:,:),bshift(:,:),d(:),g(:),headroom(:),lb(:),ub(:),x(:),xtrial(:),gsum(:),hdiag(:)
 
 ! *************************************************************************
+
+ talk = .true.
+ if (present(verbose)) talk = verbose
+ eshift = zero
+ if (present(e_shift)) eshift = e_shift
+ if (talk) then
+   write(msg,'(2a)') ch10,' Occupation numbers, Newton-SQP:   iter     Etotal(Ha)       |step|        g.d       alpha    lambda  qp_ok'
+   call wrtout([ab_out,std_out],msg)
+ end if
 
  ! Variables: one per orbital, shared with the time-reversal partner
  ABI_MALLOC(var_of,(nbk))
@@ -482,9 +494,10 @@ subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,n0,ntarget,e
      alph = alph*half
    end do
    x = xtrial
-   write(msg,'(a,i4,a,es20.12,a,es10.3,a,l2,a,es10.3,a,es10.3,a,es10.3)') '   RDMFT SQP iteration ',iter,'  E = ',ftrial,&
-     '  |step| = ',sqrt(sum(d**2)),'  qp_ok =',qp_ok,'  g.d =',dirder,'  alpha =',alph,'  lambda =',lambda
-   call wrtout(std_out,msg)
+   if (talk) then
+     write(msg,'(a,i5,f20.12,es12.3,es11.3,2es10.2,l4)') '  OCC',iter,ftrial+eshift,sqrt(sum(d**2)),dirder,alph,lambda,qp_ok
+     call wrtout([ab_out,std_out],msg)
+   end if
  end do
 
  call expand(x,nout)
@@ -582,11 +595,13 @@ end subroutine rdmft_optimize_jk
 !!
 !! SOURCE
 subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,use_start,n0,gtol,maxit,check_grad,&
-                               nout,energy,converged,niter)
+                               nout,energy,converged,niter,verbose,e_shift)
 
  !Arguments ------------------------------------
  !scalars
  integer,intent(in) :: func,nk,nbk,selfint,maxit
+ logical,optional,intent(in) :: verbose
+ real(dp),optional,intent(in) :: e_shift
  real(dp),intent(in) :: gtol
  logical,intent(in) :: check_grad,use_start
  type(rdmft_pnof_table_t),intent(in) :: table
@@ -603,12 +618,22 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
  integer,parameter :: nhist=10,max_ls=60
  integer :: i,iter,ils,ih,nstored,ngam
  real(dp),parameter :: pi4=0.78539816339744830962_dp,c1=1.0e-4_dp
- real(dp) :: alph,beta,dirder,f0,ftrial,gamma_scale,sy,yy,fp,fm,step
+ real(dp) :: alph,beta,dirder,eshift,f0,ftrial,gamma_scale,sy,yy,fp,fm,step
+ logical :: talk
  character(len=500) :: msg
  !arrays
  real(dp),allocatable :: gam(:),gnew(:),g(:),dvec(:),gtrial(:),xtrial(:),smat(:,:),ymat(:,:),rho(:),alpha_l(:),q(:)
 
 ! *************************************************************************
+
+ talk = .true.
+ if (present(verbose)) talk = verbose
+ eshift = zero
+ if (present(e_shift)) eshift = e_shift
+ if (talk) then
+   write(msg,'(2a)') ch10,' Occupation numbers, L-BFGS:   iter     Etotal(Ha)       max|g|'
+   call wrtout([ab_out,std_out],msg)
+ end if
 
  ngam = table%ngam
  ABI_MALLOC(gam,(ngam))
@@ -701,9 +726,9 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
    gam = xtrial
    g = gtrial
    f0 = ftrial
-   if (mod(iter,10) == 1) then
-     write(msg,'(a,i5,a,es20.12,a,es10.3)') '   RDMFT PNOF L-BFGS iteration ',iter,'  E = ',f0,'  max|g| = ',maxval(abs(g))
-     call wrtout(std_out,msg)
+   if (talk .and. (mod(iter,10) == 1 .or. maxval(abs(g)) < gtol)) then
+     write(msg,'(a,i5,f20.12,es12.3)') '  OCC',iter,f0+eshift,maxval(abs(g))
+     call wrtout([ab_out,std_out],msg)
    end if
  end do
 
