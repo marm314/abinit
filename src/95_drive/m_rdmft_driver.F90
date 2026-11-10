@@ -1408,6 +1408,8 @@ contains
        rst_lr1 = lr
        rst_conv = conv2
        call write_checkpoint(e_new)
+       ! Only the master writes and moves the files: the other ranks wait until the pair is in place
+       call xmpi_barrier(xmpi_world)
       end if
      end if
      nstall = merge(nstall+1,0,abs(e_new-e_old) < dtset%rdmft_orb_etol)
