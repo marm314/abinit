@@ -1480,6 +1480,7 @@ subroutine chkinp(dtsets, iout, mpi_enregs, ndtset, ndtset_alloc, npsp, pspheads
    call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_adam_maxit',dt%rdmft_adam_maxit,1,iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_adam_betam',dt%rdmft_adam_betam,1,zero,iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_adam_betav',dt%rdmft_adam_betav,1,zero,iout)
+   call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_adam_eps',dt%rdmft_adam_eps,1,zero,iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_adam_rate',dt%rdmft_adam_rate,1,zero,iout)
    call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_orb_macro',dt%rdmft_orb_macro,0,iout)
    call chkint_ge(0,0,cond_string,cond_values,ierr,'rdmft_adam_iter',dt%rdmft_adam_iter,1,iout)

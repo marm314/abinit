@@ -925,6 +925,9 @@ contains
  dprarr(1,:)=dtsets(:)%rdmft_adam_betav
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_betav','DPR',0)
 
+ dprarr(1,:)=dtsets(:)%rdmft_adam_eps
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_eps','DPR',0)
+
  dprarr(1,:)=dtsets(:)%rdmft_adam_rate
  call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_adam_rate','DPR',0)
 

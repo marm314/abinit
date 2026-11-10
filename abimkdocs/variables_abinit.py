@@ -20061,6 +20061,21 @@ Decay rate of the second moment (squared modulus) of the orbital gradient in the
 ),
 
 Variable(
+    abivarname="rdmft_adam_eps",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1.0e-10,
+    mnemonics="Reduced Density Matrix Functional Theory: ADAM EPSilon",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Small constant added to the denominator of the ADAM step ([[rdmft_orb_macro]]): the step of a parameter is $-lr\,\hat m/(\sqrt{\hat v}+\epsilon)$. The components of the orbital gradient that vanish by symmetry are only round-off noise (~1e-16); with a smaller $\epsilon$ the first ADAM step turns them into steps of the size of the learning rate, with a direction fixed by the noise, so the optimization is not reproducible (for example between runs with a different number of MPI processes). $\epsilon$ must be above the noise of the gradient and well below its relevant components.
+""",
+),
+
+Variable(
     abivarname="rdmft_adam_rate",
     varset="dev",
     vartype="real",

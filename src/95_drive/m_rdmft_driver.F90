@@ -1284,7 +1284,7 @@ contains
    ABI_MALLOC(dx,(npar))
    ABI_MALLOC(h1c_b,(nbk))
    ABI_MALLOC(hmat_b,(size(hmat,1),size(hmat,2),size(hmat,3)))
-   call adam%init(npar,dtset%rdmft_adam_betam,dtset%rdmft_adam_betav)
+   call adam%init(npar,dtset%rdmft_adam_betam,dtset%rdmft_adam_betav,dtset%rdmft_adam_eps)
    call report_mem('ORB: ADAM arrays allocated')
    write(msg,'(2a,i0,a,es9.2,a,es9.2,a,es9.2,a)') ch10,' RDMFT: ADAM optimization of the orbitals (',npar,&
      ' complex rotation parameters); energy tolerance ',dtset%rdmft_orb_etol,', gradient tolerance ',dtset%rdmft_orb_gtol,&

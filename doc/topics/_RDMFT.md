@@ -164,8 +164,9 @@ parameters (and the rotations at time-reversal-invariant k-points are real). The
 $\kappa_{pq}$ ($p<q$), and the gradient is the analytic one of the previous section.
 
 The ADAM optimizer is the complex version of the one of ReRDMFT: complex first moment (decay [[rdmft_adam_betam]]), a real
-second moment of $|g|^2$ shared by the real and imaginary parts ([[rdmft_adam_betav]]), bias corrections and the running
-maximum of the second moment. A run has [[rdmft_adam_iter]] iterations (learning rate [[rdmft_adam_lr]]) and stops earlier
+second moment of $|g|^2$ shared by the real and imaginary parts ([[rdmft_adam_betav]]), bias corrections, the running
+maximum of the second moment and a constant [[rdmft_adam_eps]] in the denominator of the step (it keeps the components of
+the gradient that are zero by symmetry, only round-off, from being amplified into steps of the size of the learning rate). A run has [[rdmft_adam_iter]] iterations (learning rate [[rdmft_adam_lr]]) and stops earlier
 if the largest gradient is below [[rdmft_orb_gtol]] or the energy changes by less than [[rdmft_orb_etol]]. If a run does not
 lower the energy, it restarts from the best point with the learning rate multiplied by [[rdmft_adam_rate]] and
 [[rdmft_adam_incr]] more iterations (up to [[rdmft_adam_maxit]]). The rotations are limited to the bands of the WFK file:

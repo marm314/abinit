@@ -40,7 +40,7 @@ module m_rdmft_adam
    integer :: nstep = 0
    real(dp) :: beta1 = 0.7_dp
    real(dp) :: beta2 = 0.9_dp
-   real(dp) :: eps = 1.0e-15_dp
+   real(dp) :: eps = 1.0e-10_dp
    complex(dpc),allocatable :: m1(:)
    real(dp),allocatable :: m2(:)
    real(dp),allocatable :: m2max(:)
@@ -67,15 +67,17 @@ contains
 !! INPUTS
 !!  n = number of parameters
 !!  beta1, beta2 = decay rates of the first and second moments
+!!  eps = small constant added to the denominator of the step: the components of the gradient below it (zero by symmetry,
+!!        only round-off) are not amplified into steps of the size of the learning rate
 !!
 !! SOURCE
-subroutine rdmft_adam_init(adam,n,beta1,beta2)
+subroutine rdmft_adam_init(adam,n,beta1,beta2,eps)
 
  !Arguments ------------------------------------
  !scalars
  class(rdmft_adam_t),intent(inout) :: adam
  integer,intent(in) :: n
- real(dp),intent(in) :: beta1,beta2
+ real(dp),intent(in) :: beta1,beta2,eps
 
 ! *************************************************************************
 
@@ -83,6 +85,7 @@ subroutine rdmft_adam_init(adam,n,beta1,beta2)
  adam%n = n
  adam%beta1 = beta1
  adam%beta2 = beta2
+ adam%eps = eps
  ABI_MALLOC(adam%m1,(n))
  ABI_MALLOC(adam%m2,(n))
  ABI_MALLOC(adam%m2max,(n))
