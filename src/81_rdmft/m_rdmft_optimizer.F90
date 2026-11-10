@@ -676,7 +676,7 @@ subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,n0,ntarget,e
  if (talk) then
    write(msg,'(3a)') ch10,' Occupation numbers, Newton-SQP:   iter     Etotal(Ha)       |step|        g.d       alpha',&
      '    lambda  qp_ok'
-   call wrtout([ab_out,std_out],msg)
+   call wrtout([std_out],msg)
  end if
 
  ! Variables: one per orbital, shared with the time-reversal partner
@@ -777,7 +777,7 @@ subroutine rdmft_optimize_jk(func,nk,nbk,h1,jint,kint,alpha,partner,n0,ntarget,e
    x = xtrial
    if (talk) then
      write(msg,'(a,i5,f20.12,es12.3,es11.3,2es10.2,l4)') '  OCC',iter,ftrial+eshift,sqrt(sum(d**2)),dirder,alph,lambda,qp_ok
-     call wrtout([ab_out,std_out],msg)
+     call wrtout([std_out],msg)
    end if
  end do
 
@@ -967,7 +967,7 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
  if (present(e_shift)) eshift = e_shift
  if (talk) then
    write(msg,'(2a)') ch10,' Occupation numbers, L-BFGS:   iter     Etotal(Ha)       max|g|'
-   call wrtout([ab_out,std_out],msg)
+   call wrtout([std_out],msg)
  end if
 
  ngam = table%ngam
@@ -1077,13 +1077,13 @@ subroutine rdmft_optimize_pnof(func,table,nk,nbk,h1,jint,kint,selfint,bj,bk,bg,u
      converged = .true.
      if (talk) then
        write(msg,'(a,i5,f20.12,es12.3,a)') '  OCC',iter,f0+eshift,maxval(abs(g)),'  (energy stationary to round-off)'
-       call wrtout([ab_out,std_out],msg)
+       call wrtout([std_out],msg)
      end if
      exit
    end if
    if (talk .and. (mod(iter,10) == 1 .or. maxval(abs(g)) < gtol)) then
      write(msg,'(a,i5,f20.12,es12.3)') '  OCC',iter,f0+eshift,maxval(abs(g))
-     call wrtout([ab_out,std_out],msg)
+     call wrtout([std_out],msg)
    end if
  end do
 

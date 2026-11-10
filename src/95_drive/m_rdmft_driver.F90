@@ -1311,11 +1311,11 @@ contains
      e_prev = e_best
      write(msg,'(a,i0,a,i0,a,es9.2,a,i0,a,i0,a)') ch10//' ADAM orbital rotations, macro-iteration ',imac,' (at most ',&
        icall_max,' iterations, learning rate ',lr,'); orbitals kept in the pair sums: ',nrel_last,' of ',nbk,' (rdmft_occ_skip)'
-     call wrtout([ab_out,std_out],msg)
+     call wrtout([std_out],msg)
      write(msg,'(a)') '  ORB  macro  iter        Etotal(Ha)      deltaE(Ha)    max|g|'
-     call wrtout([ab_out,std_out],msg)
+     call wrtout([std_out],msg)
      write(msg,'(a,2i6,f20.12,a,es10.2)') '  ORB',imac,0,e_best,'                ',gmax
-     call wrtout([ab_out,std_out],msg)
+     call wrtout([std_out],msg)
      nadam = 0
      orbs_b = orbs
      h1c_b = h1c
@@ -1339,7 +1339,7 @@ contains
        call eval_point(kpar,e_new,grad,gmax)
        nadam = icall
        write(msg,'(a,2i6,f20.12,es16.3,es10.2)') '  ORB',imac,icall,e_new,e_new-e_prev,gmax
-       call wrtout([ab_out,std_out],msg)
+       call wrtout([std_out],msg)
        if (e_new < e_best-tol14) then
          e_best = e_new
          improved = .true.
