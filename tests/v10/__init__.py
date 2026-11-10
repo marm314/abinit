@@ -67,6 +67,7 @@ inp_files = [
     "t82.abi" ,  # Test restart of MD from the HIST of previous test using restartxf -1
     "t83.abi" ,  # Test variable cell nudged elastic band method
     "t84.abi" ,  # Test nuclear spin dipole coupling by energy difference
+    "t85.abi" ,  # N2 molecule, 2x2x2 k mesh: LDA, Hartree-Fock and RDMFT (GNOF) driver, cheap smoke test
     "t104.abi" , # Test Si spectral function and mobilities :step 1 WFK
     "t105.abi" , # Test Si spectral function and mobilities :step 2 merge DDB
     "t106.abi" , # Test Si spectral function and mobilities :step 3 merge DVDB

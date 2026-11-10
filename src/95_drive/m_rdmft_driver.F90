@@ -517,7 +517,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    call report_mem('end of the run')
    write(msg,'(a,7f9.2)') ' RDMFT: elapsed (s) after read WFK / completion+TR / orbital setup / integrals / first occupations'//&
      ' / orbital macro / output =',tst
-   call wrtout([ab_out,std_out],msg)
+   call wrtout(std_out,msg)
    rst_conv = conv
  if (xmpi_comm_rank(xmpi_world) == master) then
    call write_occ_file(trim(dtfil%filnam_ds(4))//'_RDMFT_OCC')
@@ -579,7 +579,7 @@ contains
    end if
    if (xmpi_comm_rank(xmpi_world) == master) then
      write(msg,'(4a)') ' RDMFT: memory of the master process ',trim(label),': peak '//trim(hwm)//', current ',trim(rss)
-     call wrtout([ab_out,std_out],msg)
+     call wrtout(std_out,msg)
    end if
  end subroutine report_mem
 
