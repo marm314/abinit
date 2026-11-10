@@ -186,24 +186,9 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    call wrtout([ab_out,std_out],msg)
  end if
 
- !Size of the orbital space with respect to the plane-wave basis of ecut
- write(msg,'(2a,i0,a,i0,a,i0,a,i0,a,f6.1,a)') ch10,' RDMFT: bands per k-point: ',minval(orbs%nband(:,1)),'-',&
-   maxval(orbs%nband(:,1)),'; plane waves per k-point (ecut): ',minval(orbs%npw),'-',maxval(orbs%npw),' (the bands are ',&
-   100.0_dp*real(sum(orbs%nband(:,1)),dp)/real(sum(orbs%npw),dp),' % of the plane-wave basis)'
- call wrtout([ab_out,std_out],msg)
- if (all(orbs%nband(:,1) == orbs%npw)) then
-   write(msg,'(2a)') ' RDMFT: the plane-wave basis is complete: the occupations and the orbital rotations span all the',&
-     ' states that ecut can produce.'
- else
-   write(msg,'(3a)') ' RDMFT: the occupations and the orbital rotations are restricted to these bands (a variational ',&
-     'restriction of the orbital space, the energies are upper bounds of the full-basis ones);',&
-     ' use rdmft_complete = 1 to span the whole plane-wave basis.'
- end if
- call wrtout([ab_out,std_out],msg)
-
  maxdev = orbs%check_orthonormality()
- write(msg,'(2a,es12.4,a)') ch10,' RDMFT: maximum deviation from orthonormality of the orbitals = ',maxdev,ch10
- call wrtout([ab_out,std_out],msg)
+ write(msg,'(a,es12.4)') ' RDMFT: maximum deviation from orthonormality of the orbitals of the WFK file = ',maxdev
+ call wrtout(std_out,msg)
 
  !Alignment of the orbitals at -k with the time-reversed orbitals of k (assumed by the ties of the occupations of k and -k)
  call orbs%tr_alignment(devtr,ik_w,ib_w)
@@ -228,6 +213,29 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      ' alignment after the replacement: ',devtr,ch10
    call wrtout([ab_out,std_out],msg)
  end if
+
+ !If the ground-state WFK holds the irreducible BZ (kptopt 1 or 4 with symmetries), expand it to the full BZ. The bases of
+ !the time-reversal-invariant k-points were made real above, before the rotations
+ call orbs%expand_ibz(nadded)
+
+ !Size of the orbital space with respect to the plane-wave basis of ecut
+ write(msg,'(2a,i0,a,i0,a,i0,a,i0,a,f6.1,a)') ch10,' RDMFT: bands per k-point: ',minval(orbs%nband(:,1)),'-',&
+   maxval(orbs%nband(:,1)),'; plane waves per k-point (ecut): ',minval(orbs%npw),'-',maxval(orbs%npw),' (the bands are ',&
+   100.0_dp*real(sum(orbs%nband(:,1)),dp)/real(sum(orbs%npw),dp),' % of the plane-wave basis)'
+ call wrtout([ab_out,std_out],msg)
+ if (all(orbs%nband(:,1) == orbs%npw)) then
+   write(msg,'(2a)') ' RDMFT: the plane-wave basis is complete: the occupations and the orbital rotations span all the',&
+     ' states that ecut can produce.'
+ else
+   write(msg,'(3a)') ' RDMFT: the occupations and the orbital rotations are restricted to these bands (a variational ',&
+     'restriction of the orbital space, the energies are upper bounds of the full-basis ones);',&
+     ' use rdmft_complete = 1 to span the whole plane-wave basis.'
+ end if
+ call wrtout([ab_out,std_out],msg)
+
+ maxdev = orbs%check_orthonormality()
+ write(msg,'(2a,es12.4,a)') ch10,' RDMFT: maximum deviation from orthonormality of the orbitals = ',maxdev,ch10
+ call wrtout([ab_out,std_out],msg)
 
  !Complete the mesh with the time-reversed orbitals (c_{n,-k}(G) = conjg(c_{nk}(-G))) if the mesh is not closed under
  !k -> -k, for all the functionals (for example a WFK file computed with the k-points reduced by time reversal)
