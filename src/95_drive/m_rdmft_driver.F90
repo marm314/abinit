@@ -149,6 +149,13 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  is_jk = (dtset%rdmft_functional >= RDMFT_SD .and. dtset%rdmft_functional <= RDMFT_MULLER_AS)
  is_pnof = (dtset%rdmft_functional >= RDMFT_PNOF5 .and. dtset%rdmft_functional <= RDMFT_GNOF)
 
+ !Fixed orbitals (non self-consistent): only the SD energy is independent of the arbitrary basis inside degenerate shells
+ if (dtset%rdmft_orb_macro == 0 .and. dtset%rdmft_functional /= RDMFT_SD) then
+   ABI_WARNING(' RDMFT: rdmft_orb_macro = 0 (fixed orbitals) with a functional other than SD. The energy of these functionals depends on the&
+&   arbitrary basis chosen by the eigensolver inside degenerate shells (about 5e-5 Ha between eigensolvers in the tests). &
+&   Use rdmft_orb_macro > 0 to optimize the orbitals if you need a reproducible result.')
+ end if
+
  write(msg,'(3a)') ch10,' RDMFT driver (code version '//trim(codvsn)//')',ch10
  call wrtout([ab_out,std_out],msg)
 
