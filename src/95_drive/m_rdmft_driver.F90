@@ -486,7 +486,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    end if
    if (dtset%rdmft_restart == 1 .and. .not.restart_full) call read_occ_file(nf,ints%comp_of,offset,orbs%nband(:,1),n0)
 
-   call optimize_occupations(n0,eopt,conv,niter,.true.)
+   call optimize_occupations(n0,eopt,conv,niter,dtset%prtvol >= 10)
    tst(5) = abi_wtime()-t_start
    call report_mem('after the first occupation optimization')
    write(msg,'(2a,i0,a,l1,a)') ch10,' RDMFT: occupation numbers optimized for the functional ',dtset%rdmft_functional,&
@@ -1312,10 +1312,13 @@ contains
      write(msg,'(a,i0,a,i0,a,es9.2,a,i0,a,i0,a)') ch10//' ADAM orbital rotations, macro-iteration ',imac,' (at most ',&
        icall_max,' iterations, learning rate ',lr,'); orbitals kept in the pair sums: ',nrel_last,' of ',nbk,' (rdmft_occ_skip)'
      call wrtout([std_out],msg)
-     write(msg,'(a)') '  ORB  macro  iter        Etotal(Ha)      deltaE(Ha)    max|g|'
-     call wrtout([std_out],msg)
-     write(msg,'(a,2i6,f20.12,a,es10.2)') '  ORB',imac,0,e_best,'                ',gmax
-     call wrtout([std_out],msg)
+     ! the per-iteration ORB rows are printed only in the verbose mode (prtvol >= 10)
+     if (dtset%prtvol >= 10) then
+       write(msg,'(a)') '  ORB  macro  iter        Etotal(Ha)      deltaE(Ha)    max|g|'
+       call wrtout([std_out],msg)
+       write(msg,'(a,2i6,f20.12,a,es10.2)') '  ORB',imac,0,e_best,'                ',gmax
+       call wrtout([std_out],msg)
+     end if
      nadam = 0
      orbs_b = orbs
      h1c_b = h1c
@@ -1338,8 +1341,10 @@ contains
        tm(4) = tm(4)+abi_wtime()-t0
        call eval_point(kpar,e_new,grad,gmax)
        nadam = icall
-       write(msg,'(a,2i6,f20.12,es16.3,es10.2)') '  ORB',imac,icall,e_new,e_new-e_prev,gmax
-       call wrtout([std_out],msg)
+       if (dtset%prtvol >= 10) then
+         write(msg,'(a,2i6,f20.12,es16.3,es10.2)') '  ORB',imac,icall,e_new,e_new-e_prev,gmax
+         call wrtout([std_out],msg)
+       end if
        if (e_new < e_best-tol14) then
          e_best = e_new
          improved = .true.
