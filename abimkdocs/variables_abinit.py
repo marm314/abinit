@@ -20076,6 +20076,21 @@ Small constant added to the denominator of the ADAM step ([[rdmft_orb_macro]]): 
 ),
 
 Variable(
+    abivarname="rdmft_sym_unfold",
+    varset="dev",
+    vartype="real",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=0.05,
+    mnemonics="Reduced Density Matrix Functional Theory: SYMmetry UNFOLD threshold",
+    characteristics=["[[DEVELOP]]", "[[ENERGY]]"],
+    added_in_version="10.9.3",
+    text=r"""
+Only for [[rdmft_sym_reduce]] = 1 or 2 and a PNOF. In the table of subspaces invariant under the symmetry operations, a principal orbital of a *one-representative* star (reducible k-points, whose orbitals follow from one representative by the symmetry operations) cannot be coupled with an orbital of a *k-independent* k-point (little group that mixes the bands), since the subspaces would no longer be images of each other. If such a refused virtual orbital lies less than **rdmft_sym_unfold** above the principal orbital (Hartree), the coupling would be important (near-degenerate pair) and the star of the principal orbital is *unfolded*: its k-points become k-independent, they lose the symmetry reduction and can be coupled with any orbital as in the full BZ. The unfolded stars are listed in the output. The process is repeated until no such coupling is refused. With a negative value nothing is unfolded and the refused couplings are only reported; with a very large value every star with a refused coupling is unfolded, and the result tends to the calculation with [[rdmft_sym_reduce]] = 0.
+""",
+),
+
+Variable(
     abivarname="rdmft_adam_rate",
     varset="dev",
     vartype="real",

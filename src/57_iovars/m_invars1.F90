@@ -2849,6 +2849,7 @@ subroutine indefo(dtsets, ndtset_alloc, nprocs)
    dtsets(idtset)%rdmft_start=0
    dtsets(idtset)%rdmft_tr_reduce=1
    dtsets(idtset)%rdmft_sym_reduce=1
+   dtsets(idtset)%rdmft_sym_unfold=0.05_dp
    dtsets(idtset)%rdmft_occ_min=1.0e-6_dp
    dtsets(idtset)%rdmft_occ_skip=1.0e-5_dp
    dtsets(idtset)%rdmft_complete=0

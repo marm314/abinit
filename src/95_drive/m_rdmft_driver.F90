@@ -110,7 +110,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  integer :: ib,ierr,ierr_t,ifunc,ik,ik_w,ib_w,iop,ip,iq,jk,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
  logical :: conv,is_jk,is_pnof,need_table,ok_fd,table_ok,use_sym,sym_ok
  integer :: nspec,ndeg
- integer :: nok_sym,ntot_sym
+ integer :: nok_sym,ntot_sym,isk,nprt,nskip1,nunf,nfold
  real(dp) :: dev_sym
  real(dp) :: alpha,e_corepsp,e_ewald,eexch,ehartree,ekin_tot,eone,eopt,ecut_eff,ecutdg_eff,etot,gsqcutc_eff,gsqcutf_eff
  real(dp) :: devtr,maxdev,ntarget,nk2,sexch,shart
@@ -126,7 +126,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  type(rdmft_symtab_t) :: symtab
  !arrays
  integer :: ngfftc(18),ngfftf(18)
- integer,allocatable :: bandc(:),noccb(:),offset(:),partner(:),partf(:)
+ integer,allocatable :: bandc(:),korb(:),noccb(:),offset(:),partner(:),partf(:)
  real(dp),parameter :: k0(3)=zero
  real(dp),allocatable :: rho_ref(:)
  real(dp),allocatable :: eigc(:),eigf(:),ekin(:,:),h1c(:),h1diag(:,:),h1f(:),n0(:),nc(:),nfull(:),nf_gs(:),nopt(:)
@@ -334,6 +334,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ABI_MALLOC(occd,(nbk))
  ABI_MALLOC(actc,(nbk))
  ABI_MALLOC(bandc,(nbk))
+ ABI_MALLOC(korb,(nbk))
  ABI_MALLOC(noccb,(nbk))
  ABI_MALLOC(partner,(nbk))
  offset(1) = 0
@@ -345,6 +346,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    do ib=1,orbs%nband(ik,1)
      ip = offset(ik)+ib
      bandc(ip) = ib
+     korb(ip) = ik
      noccb(ip) = nocc_k
      nc(ip) = orbs%occ(ib,ik,1)/two
      h1c(ip) = h1diag(ib,ik)
@@ -371,8 +373,74 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    ierr_t = 1
    if (need_table .and. use_sym) then
      ! Table invariant under the symmetry operations (occupation units = orbits of the orbitals)
-     call table%build_sym(nbk,orbs%nkpt,offset,orbs%nband(:,1),eigc,occd,actc,dtset%rdmft_ncoupl,orbs%star_rep,&
-                          symtab%generic,orbs%tr_k,symtab%kimg,ierr_t)
+     do
+       call table%build_sym(nbk,orbs%nkpt,offset,orbs%nband(:,1),eigc,occd,actc,dtset%rdmft_ncoupl,orbs%star_rep,&
+                            symtab%generic,orbs%tr_k,symtab%kimg,ierr_t)
+       ! Refused couplings: a one-representative principal cannot be coupled with a k-independent virtual orbital. If the
+       ! refused orbital is close in energy (rdmft_sym_unfold) the star of the principal orbital is unfolded (its k-points
+       ! become k-independent) and the table is built again
+       nunf = 0
+       do isk=1,table%nskip_rec
+         if (table%skip_why(isk) /= 1) cycle
+         ip = table%skip_p(isk)
+         iq = table%skip_v(isk)
+         ik = korb(ip)
+         jk = korb(iq)
+         if (.not.symtab%generic(ik)) cycle
+         if (dtset%rdmft_sym_unfold < zero .or. eigc(iq)-eigc(ip) >= dtset%rdmft_sym_unfold) cycle
+         write(msg,'(a,i0,a,i0,a,f10.6,a,i0,a,i0,a,f10.6,a,f9.5,a)') &
+           ' RDMFT: WARNING, the star of k-point ',ik,' (principal orbital band ',ip-offset(ik),', E = ',eigc(ip),&
+           ' Ha) cannot be coupled with the k-independent orbital band ',iq-offset(jk),' of k-point ',jk,' (E = ',eigc(iq),&
+           ' Ha, E_v-E_p = ',eigc(iq)-eigc(ip),' Ha < rdmft_sym_unfold).'
+         call wrtout([ab_out,std_out],msg)
+         nfold = 0
+         do jk = 1,orbs%nkpt
+           if (orbs%star_rep(jk) == orbs%star_rep(ik)) then
+             symtab%generic(jk) = .false.
+             nfold = nfold+1
+           end if
+         end do
+         write(msg,'(a,i0,2a)') '          The star (',nfold,' k-points) is UNFOLDED: its k-points become k-independent and ',&
+           'lose the symmetry reduction, so that the coupling is included as in the full BZ.'
+         call wrtout([ab_out,std_out],msg)
+         nunf = nunf+1
+       end do
+       if (nunf == 0) exit
+       call orbs%set_stars(.true.,symtab%generic)
+       call orbs%build_symtab(symtab,1.0e-11_dp,nok_sym,ntot_sym,dev_sym)
+       write(msg,'(a,i0,a,i0,2a)') ' RDMFT: after the unfolding, one-representative k-points: ',count(symtab%generic),' of ',&
+         orbs%nkpt,'; the table of subspaces is built again.',ch10
+       call wrtout([ab_out,std_out],msg)
+     end do
+     if (table%nskip > 0) then
+       nskip1 = count(table%skip_why(1:table%nskip_rec) == 1)
+       if (nskip1 > 0) then
+         write(msg,'(3a,i0,2a)') ch10,' RDMFT: WARNING, couplings not included in the symmetric table (k-independent virtual ',&
+           'orbital refused to a one-representative principal orbital, E_v-E_p >= rdmft_sym_unfold): ',nskip1,&
+           ch10,'         the energy may differ from the one with rdmft_sym_reduce 0.'
+         call wrtout([ab_out,std_out],msg)
+       end if
+       write(msg,'(2a,i0,a,i0,2a)') ch10,' RDMFT: virtual units refused to the principal units of the symmetric table: ',&
+         table%nskip,' (',nskip1,' because the virtual unit is k-independent and the principal one-representative)',ch10
+       call wrtout([ab_out,std_out],msg)
+       write(msg,'(a)') '   principal (band,k,E)             refused virtual (band,k,E)      E_v-E_p (Ha)  reason'
+       call wrtout([ab_out,std_out],msg)
+       nprt = min(table%nskip_rec,12)
+       do isk=1,nprt
+         ip = table%skip_p(isk)
+         iq = table%skip_v(isk)
+         ik = korb(ip)
+         jk = korb(iq)
+         write(msg,'(a,i4,i6,f12.6,a,i4,i6,f12.6,f14.6,2x,a)') '   ',ip-offset(ik),ik,eigc(ip),'        ',iq-offset(jk),jk,&
+           eigc(iq),eigc(iq)-eigc(ip),merge('k-independent virtual','no assignment        ',table%skip_why(isk) == 1)
+         call wrtout([ab_out,std_out],msg)
+       end do
+       if (table%nskip_rec > nprt) then
+         write(msg,'(a,i0,a)') '   ... (',table%nskip-nprt,' more)'
+         call wrtout([ab_out,std_out],msg)
+       end if
+       call wrtout([ab_out,std_out],ch10)
+     end if
      if (ierr_t /= 0) then
        write(msg,'(a,i0,2a)') ' RDMFT: no table of subspaces invariant under the symmetry operations (code ',ierr_t,&
          '): the symmetry reduction is not used, only time reversal.',ch10
@@ -660,6 +728,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ABI_FREE(occd)
  ABI_FREE(actc)
  ABI_FREE(bandc)
+ ABI_FREE(korb)
  ABI_FREE(noccb)
  ABI_FREE(partner)
  ABI_FREE(free)

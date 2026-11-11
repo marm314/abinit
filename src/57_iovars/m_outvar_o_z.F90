@@ -949,6 +949,9 @@ contains
  intarr(1,:)=dtsets(:)%rdmft_sym_reduce
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_sym_reduce','INT',0)
 
+ dprarr(1,:)=dtsets(:)%rdmft_sym_unfold
+ call prttagm(dprarr,intarr,iout,jdtset_,1,marr,1,narrm,ncid,ndtset_alloc,'rdmft_sym_unfold','DPR',0)
+
  intarr(1,:)=dtsets(:)%rdmft_start
  call prttagm(dprarr,intarr,iout,jdtset_,2,marr,1,narrm,ncid,ndtset_alloc,'rdmft_start','INT',0)
 

@@ -92,7 +92,9 @@ computed for one pair of k-points of each class of pairs related by the operatio
 k-point of each star of the operations. The other k-points (for example $\Gamma$, or the lines with doublets) are independent and
 unrestricted: they keep their time-reversal pairs, their orbitals can mix and localize, and their pairs are computed explicitly,
 so no degenerate shell has to be treated. For the PNOF functionals the table of subspaces is built from the stars and is invariant under the
-operations; it can differ from the one built without symmetry reduction. The reduction is a calculation restricted to the symmetry
+operations; it can differ from the one built without symmetry reduction: a principal orbital of a star cannot be coupled with an orbital of a
+k-independent k-point. The refused couplings are listed in the output; if the refused orbital is less than [[rdmft_sym_unfold]] above the
+principal one, the star of the principal orbital is unfolded (its k-points become k-independent) with a warning. The reduction is a calculation restricted to the symmetry
 of the ground state for the reducible k-points (the gradient of a star is the size of the star times the one of its representative, an
 approximation of the order of the share of independent k-points when their orbitals break the symmetry). In the tests on N2
 (4x4x4 mesh, 16 operations) the converged energies of SD, MBB and GNOF agree with the calculation without symmetry reduction

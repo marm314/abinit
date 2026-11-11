@@ -1269,6 +1269,12 @@ subroutine rdmft_orbs_build_symtab(orbs,tab,tol,nok,ntot,devmax)
  nok = 0
  ntot = 0
  devmax = zero
+ ABI_SFREE(tab%cls)
+ ABI_SFREE(tab%rep)
+ ABI_SFREE(tab%mptr)
+ ABI_SFREE(tab%mem)
+ ABI_SFREE(tab%use)
+ ABI_SFREE(tab%selft)
 
  gmax = 2*maxval(abs(orbs%kg))+1
  call ngfft_seq(work_ngfft,gmax)

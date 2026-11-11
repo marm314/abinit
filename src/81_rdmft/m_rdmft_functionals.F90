@@ -143,6 +143,18 @@ module m_rdmft_functionals
    ! orb_var(nbk)
    ! Occupation variable of each orbital (0 for the frozen orbitals); the time-reversal partners share the variable.
 
+   integer :: nskip = 0
+   ! Diagnostic of build_sym: number of virtual units refused to a principal unit (total count, also beyond the records).
+
+   integer :: nskip_rec = 0
+   ! Number of stored records (at most 2000).
+
+   integer,allocatable :: skip_p(:),skip_v(:),skip_why(:)
+   ! skip_p(nskip_rec), skip_v(nskip_rec), skip_why(nskip_rec)
+   ! Principal orbital (composite index of the one with the lowest k index of its unit), refused virtual orbital (same
+   ! convention) and reason: 1 = the virtual unit is k-independent while the principal is one-representative,
+   ! 2 = no assignment (stabilizer / orbit condition, or time-reversal-invariant k in a pair).
+
  contains
 
    procedure :: free => rdmft_pnof_table_free
@@ -703,6 +715,11 @@ subroutine rdmft_pnof_table_free(table)
  ABI_SFREE(table%class_nvirt)
  ABI_SFREE(table%var_mult)
  ABI_SFREE(table%orb_var)
+ ABI_SFREE(table%skip_p)
+ ABI_SFREE(table%skip_v)
+ ABI_SFREE(table%skip_why)
+ table%nskip = 0
+ table%nskip_rec = 0
  table%nclass = 0
  table%nvar = 0
  table%ngam = 0
@@ -1071,6 +1088,9 @@ subroutine rdmft_pnof_table_build_sym(table,nbk,nkpt,offset,nband,eig,occupied,a
  ABI_MALLOC(gsub,(nbk))
  ABI_MALLOC(gprin,(nbk))
  ABI_MALLOC(ovar,(nbk))
+ ABI_MALLOC(table%skip_p,(2000))
+ ABI_MALLOC(table%skip_v,(2000))
+ ABI_MALLOC(table%skip_why,(2000))
  used = .false.
  ovar = 0
  nc = 0
@@ -1148,6 +1168,14 @@ subroutine rdmft_pnof_table_build_sym(table,nbk,nkpt,offset,nband,eig,occupied,a
        if (ip == 0) exit
        call try_virtual(ip,found)
        if (found) exit
+       table%nskip = table%nskip+1
+       if (table%nskip_rec < 2000) then
+         table%nskip_rec = table%nskip_rec+1
+         table%skip_p(table%nskip_rec) = jp
+         table%skip_v(table%nskip_rec) = ip
+         table%skip_why(table%nskip_rec) = 2
+         if (generic(kp) .and. .not.generic(orb_k(ip))) table%skip_why(table%nskip_rec) = 1
+       end if
        do jk=1,nkpt
          if (star_rep(jk) == star_rep(orb_k(ip)) .and. orb_n(ip) <= nband(jk)) skipv(offset(jk)+orb_n(ip)) = .true.
        end do

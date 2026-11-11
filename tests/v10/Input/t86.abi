@@ -4,7 +4,9 @@
 # DS2, DS3: RDMFT, all the functionals at the ground-state occupations, with (rdmft_sym_reduce 1) and without (0)
 #   the symmetry reduction: same energies.
 # DS4, DS5: RDMFT with GNOF and fixed orbitals, symmetric table with (1) and without (2) the symmetry reduction: same energy.
-ndtset 5
+# DS6: as DS4 with rdmft_sym_unfold 1: the one-representative stars whose principal orbital cannot be coupled with a
+#   k-independent virtual orbital are unfolded; the energy is the one of the full BZ (rdmft_sym_reduce 0).
+ndtset 6
 
 acell 3*4 angstrom
 ntypat 1
@@ -63,6 +65,17 @@ rdmft_nocc_act5 1
 rdmft_ncoupl5 2
 rdmft_sym_reduce5 2
 
+optdriver6 11
+ixc6 40
+fock_icutcoul6 3
+getwfk6 1
+rdmft_selfint6 1
+rdmft_functional6 24
+rdmft_nocc_act6 1
+rdmft_ncoupl6 2
+rdmft_sym_reduce6 1
+rdmft_sym_unfold6 1.0
+
 #%%<BEGIN TEST_INFO>
 #%% [setup]
 #%% executable = abinit
@@ -79,4 +92,6 @@ rdmft_sym_reduce5 2
 #%%   full BZ by the RDMFT driver (optdriver 11), and symmetry reduction of the integrals (rdmft_sym_reduce).
 #%%   DS2/DS3: all the functionals at the ground-state occupations with and without the reduction (same energies);
 #%%   DS4/DS5: GNOF with fixed orbitals and the symmetric table of subspaces, with and without the reduction (same energy).
+#%%   DS6: as DS4 with rdmft_sym_unfold 1: the stars of the principal orbitals with a refused k-independent virtual orbital
+#%%   are unfolded, the energy is the one of the full BZ (rdmft_sym_reduce 0).
 #%%<END TEST_INFO>
