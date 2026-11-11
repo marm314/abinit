@@ -1,0 +1,1985 @@
+
+.Version 10.9.3 of ABINIT. v10.9.3 released Aug 2026.
+.(MPI version, prepared for a x86_64_linux_gnu15.2 computer) 
+
+.Copyright (C) 1998-2026 ABINIT group . 
+ ABINIT comes with ABSOLUTELY NO WARRANTY.
+ It is free software, and you are welcome to redistribute it
+ under certain conditions (GNU General Public License,
+ see ~abinit/COPYING or http://www.gnu.org/copyleft/gpl.txt).
+
+ ABINIT is a project of the Universite Catholique de Louvain,
+ Corning Inc. and other collaborators, see ~abinit/doc/developers/contributors.txt .
+ Please read https://docs.abinit.org/theory/acknowledgments for suggested
+ acknowledgments of the ABINIT effort.
+ For more information, see https://www.abinit.org .
+
+.Starting date : Wed 11 Nov 2026.
+- ( at 03h09 )
+  
+- input  file    -> /tmp/claude-1000/-home-marm314-Installers-abinit-abinit/ed8f7846-c227-46b8-92c3-463a53694f41/scratchpad/wd86/v10_t86/t86.abi
+- output file    -> t86.abo
+- root for input  files -> t86i
+- root for output files -> t86o
+
+ DATASET    1 : space group P4/m m m (#123); Bravais tP (primitive tetrag.)
+================================================================================
+ Values of the parameters that define the memory need for DATASET  1.
+     intxc =       0    ionmov =       0      iscf =       7    lmnmax =       4
+     lnmax =       4     mgfft =      15  mpssoang =       2    mqgrid =    3001
+     natom =       2  nloc_mem =       1    nspden =       1   nspinor =       1
+    nsppol =       1      nsym =      16    n1xccc =    2501    ntypat =       1
+    occopt =       1   xclevel =       2
+-    mband =          10        mffmem =           1         mkmem =          18
+       mpw =         175          nfft =        3375          nkpt =          18
+================================================================================
+P This job should need less than                       2.238 Mbytes of memory.
+  Rough estimation (10% accuracy) of disk space for files :
+_ WF disk file :      0.483 Mbytes ; DEN or POT disk file :      0.028 Mbytes.
+================================================================================
+
+ DATASET    2 : space group P4/m m m (#123); Bravais tP (primitive tetrag.)
+================================================================================
+ Values of the parameters that define the memory need for DATASET  2.
+     intxc =       0    ionmov =       0      iscf =       7    lmnmax =       4
+     lnmax =       4     mgfft =      15  mpssoang =       2    mqgrid =    3001
+     natom =       2  nloc_mem =       1    nspden =       1   nspinor =       1
+    nsppol =       1      nsym =      16    n1xccc =    2501    ntypat =       1
+    occopt =       1   xclevel =       0
+-    mband =          10        mffmem =           1         mkmem =          18
+       mpw =         175          nfft =        3375          nkpt =          18
+================================================================================
+P This job should need less than                       2.238 Mbytes of memory.
+  Rough estimation (10% accuracy) of disk space for files :
+_ WF disk file :      0.483 Mbytes ; DEN or POT disk file :      0.028 Mbytes.
+================================================================================
+
+ DATASET    3 : space group P4/m m m (#123); Bravais tP (primitive tetrag.)
+================================================================================
+ Values of the parameters that define the memory need for DATASET  3.
+     intxc =       0    ionmov =       0      iscf =       7    lmnmax =       4
+     lnmax =       4     mgfft =      15  mpssoang =       2    mqgrid =    3001
+     natom =       2  nloc_mem =       1    nspden =       1   nspinor =       1
+    nsppol =       1      nsym =      16    n1xccc =    2501    ntypat =       1
+    occopt =       1   xclevel =       0
+-    mband =          10        mffmem =           1         mkmem =          18
+       mpw =         175          nfft =        3375          nkpt =          18
+================================================================================
+P This job should need less than                       2.238 Mbytes of memory.
+  Rough estimation (10% accuracy) of disk space for files :
+_ WF disk file :      0.483 Mbytes ; DEN or POT disk file :      0.028 Mbytes.
+================================================================================
+
+ DATASET    4 : space group P4/m m m (#123); Bravais tP (primitive tetrag.)
+================================================================================
+ Values of the parameters that define the memory need for DATASET  4.
+     intxc =       0    ionmov =       0      iscf =       7    lmnmax =       4
+     lnmax =       4     mgfft =      15  mpssoang =       2    mqgrid =    3001
+     natom =       2  nloc_mem =       1    nspden =       1   nspinor =       1
+    nsppol =       1      nsym =      16    n1xccc =    2501    ntypat =       1
+    occopt =       1   xclevel =       0
+-    mband =          10        mffmem =           1         mkmem =          18
+       mpw =         175          nfft =        3375          nkpt =          18
+================================================================================
+P This job should need less than                       2.238 Mbytes of memory.
+  Rough estimation (10% accuracy) of disk space for files :
+_ WF disk file :      0.483 Mbytes ; DEN or POT disk file :      0.028 Mbytes.
+================================================================================
+
+ DATASET    5 : space group P4/m m m (#123); Bravais tP (primitive tetrag.)
+================================================================================
+ Values of the parameters that define the memory need for DATASET  5.
+     intxc =       0    ionmov =       0      iscf =       7    lmnmax =       4
+     lnmax =       4     mgfft =      15  mpssoang =       2    mqgrid =    3001
+     natom =       2  nloc_mem =       1    nspden =       1   nspinor =       1
+    nsppol =       1      nsym =      16    n1xccc =    2501    ntypat =       1
+    occopt =       1   xclevel =       0
+-    mband =          10        mffmem =           1         mkmem =          18
+       mpw =         175          nfft =        3375          nkpt =          18
+================================================================================
+P This job should need less than                       2.238 Mbytes of memory.
+  Rough estimation (10% accuracy) of disk space for files :
+_ WF disk file :      0.483 Mbytes ; DEN or POT disk file :      0.028 Mbytes.
+================================================================================
+
+--------------------------------------------------------------------------------
+------------- Echo of variables that govern the present computation ------------
+--------------------------------------------------------------------------------
+-
+- outvars: echo of selected default values
+-   iomode0 =  0 , fftalg0 =112 , wfoptalg0 =  0
+-
+- outvars: echo of global parameters not present in the input file
+-  max_nthreads =    0
+-
+ -outvars: echo values of preprocessed input variables --------
+            acell      7.5589045036E+00  7.5589045036E+00  7.5589045036E+00 Bohr
+              amu      1.40067400E+01
+             ecut      4.00000000E+00 Hartree
+-          fftalg         112
+    fock_icutcoul1          0
+    fock_icutcoul2          3
+    fock_icutcoul3          3
+    fock_icutcoul4          3
+    fock_icutcoul5          3
+           getwfk1          0
+           getwfk2          1
+           getwfk3          1
+           getwfk4          1
+           getwfk5          1
+           istwfk        1    0    1    0    0    0    1    0    1    0
+                         0    0    0    0    0    1    0    1
+              ixc1         11
+              ixc2         40
+              ixc3         40
+              ixc4         40
+              ixc5         40
+           jdtset        1    2    3    4    5
+              kpt      0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+         kptns_hf2     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+         kptns_hf3     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+         kptns_hf4     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+         kptns_hf5     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+                       outvar_i_n : Printing only first  50 k-points.
+         kptrlatt        4    0    0      0    4    0      0    0    4
+          kptrlen      3.02356180E+01
+P           mkmem          18
+            natom           2
+            nband          10
+          nbandhf           5
+           ndtset           5
+            ngfft          15      15      15
+             nkpt          18
+           nkpthf          64
+            nstep          60
+             nsym          16
+           ntypat           1
+              occ      2.000000  2.000000  2.000000  2.000000  2.000000  0.000000
+                       0.000000  0.000000  0.000000  0.000000
+        optdriver1          0
+        optdriver2         11
+        optdriver3         11
+        optdriver4         11
+        optdriver5         11
+        optstress1          1
+        optstress2          0
+        optstress3          0
+        optstress4          0
+        optstress5          0
+           prtden1          1
+           prtden2          0
+           prtden3          0
+           prtden4          0
+           prtden5          0
+ rdmft_sym_reduce1          1
+ rdmft_sym_reduce2          1
+ rdmft_sym_reduce3          0
+ rdmft_sym_reduce4          1
+ rdmft_sym_reduce5          2
+ rdmft_functional1          0
+ rdmft_functional2          0
+ rdmft_functional3          0
+ rdmft_functional4         24
+ rdmft_functional5         24
+   rdmft_nocc_act1          0
+   rdmft_nocc_act2          0
+   rdmft_nocc_act3          0
+   rdmft_nocc_act4          1
+   rdmft_nocc_act5          1
+    rdmft_selfint1          0
+    rdmft_selfint2          1
+    rdmft_selfint3          1
+    rdmft_selfint4          1
+    rdmft_selfint5          1
+          spgroup         123
+           symrel      1  0  0   0  1  0   0  0  1      -1  0  0   0 -1  0   0  0 -1
+                      -1  0  0   0  1  0   0  0 -1       1  0  0   0 -1  0   0  0  1
+                      -1  0  0   0 -1  0   0  0  1       1  0  0   0  1  0   0  0 -1
+                       1  0  0   0 -1  0   0  0 -1      -1  0  0   0  1  0   0  0  1
+                       1  0  0   0  0  1   0  1  0      -1  0  0   0  0 -1   0 -1  0
+                      -1  0  0   0  0  1   0 -1  0       1  0  0   0  0 -1   0  1  0
+                      -1  0  0   0  0 -1   0  1  0       1  0  0   0  0  1   0 -1  0
+                       1  0  0   0  0 -1   0 -1  0      -1  0  0   0  0  1   0  1  0
+           tolvrs      1.00000000E-12
+            typat      1  1
+          usefock1          0
+          usefock2          1
+          usefock3          1
+          usefock4          1
+          usefock5          1
+              wtk        0.01563    0.03125    0.01563    0.06250    0.12500    0.06250
+                         0.03125    0.06250    0.03125    0.06250    0.12500    0.06250
+                         0.06250    0.12500    0.06250    0.01563    0.03125    0.01563
+           xangst     -5.5000000000E-01  0.0000000000E+00  0.0000000000E+00
+                       5.5000000000E-01  0.0000000000E+00  0.0000000000E+00
+            xcart     -1.0393493692E+00  0.0000000000E+00  0.0000000000E+00
+                       1.0393493692E+00  0.0000000000E+00  0.0000000000E+00
+             xred     -1.3750000000E-01  0.0000000000E+00  0.0000000000E+00
+                       1.3750000000E-01  0.0000000000E+00  0.0000000000E+00
+            znucl        7.00000
+
+================================================================================
+
+ chkinp: Checking input parameters for consistency, jdtset=   1.
+
+ chkinp: Checking input parameters for consistency, jdtset=   2.
+
+ chkinp: Checking input parameters for consistency, jdtset=   3.
+
+ chkinp: Checking input parameters for consistency, jdtset=   4.
+
+ chkinp: Checking input parameters for consistency, jdtset=   5.
+
+================================================================================
+== DATASET  1 ==================================================================
+-   mpi_nproc: 1, omp_nthreads: -1 (-1 if OMP is not activated)
+
+
+--- !DatasetInfo
+iteration_state: {dtset: 1, }
+dimensions: {natom: 2, nkpt: 18, mband: 10, nsppol: 1, nspinor: 1, nspden: 1, mpw: 175, }
+cutoff_energies: {ecut:   4.0, pawecutdg:  -1.0, }
+electrons: {nelect:   1.00000000E+01, charge:   0.00000000E+00, occopt:   1.00000000E+00, tsmear:   1.00000000E-02, }
+meta: {optdriver: 0, ionmov: 0, optcell: 0, iscf: 7, paral_kgb: 0, }
+...
+
+ Exchange-correlation functional for the present dataset will be:
+  GGA: Perdew-Burke-Ernzerhof functional - ixc=11
+ Citation for XC functional:
+  J.P.Perdew, K.Burke, M.Ernzerhof, PRL 77, 3865 (1996)
+
+ Real(R)+Recip(G) space primitive vectors, cartesian coordinates (Bohr,Bohr^-1):
+ R(1)=  7.5589045  0.0000000  0.0000000  G(1)=  0.1322943  0.0000000  0.0000000
+ R(2)=  0.0000000  7.5589045  0.0000000  G(2)=  0.0000000  0.1322943  0.0000000
+ R(3)=  0.0000000  0.0000000  7.5589045  G(3)=  0.0000000  0.0000000  0.1322943
+ Unit cell volume ucvol=  4.3189341E+02 bohr^3
+ Angles (23,13,12)=  9.00000000E+01  9.00000000E+01  9.00000000E+01 degrees
+
+ getcut: wavevector=  0.0000  0.0000  0.0000  ngfft=  15  15  15
+         ecut(hartree)=      4.000   => boxcut(ratio)=   2.05719
+
+--- Pseudopotential description ------------------------------------------------
+- pspini: atom type   1  psp file is /home/marm314/Installers/abinit/abinit/tests/Pspdir/Psdj_nc_sr_04_pw_std_psp8/N.psp8
+- pspatm: opening atomic psp file    /home/marm314/Installers/abinit/abinit/tests/Pspdir/Psdj_nc_sr_04_pw_std_psp8/N.psp8
+- N     ONCVPSP-3.3.0  r_core=   1.20551   1.35824
+-  7.00000   5.00000    171101                znucl, zion, pspdat
+    8   -1012    1    4       600   0.00000   pspcod,pspxc,lmax,lloc,mmax,r2well
+    5.99000000000000    4.00000000000000    0.00000000000000   rchrg,fchrg,qchrg
+     nproj     2     2
+     extension_switch     1
+  pspatm : epsatm=    5.30777697
+         --- l  ekb(1:nproj) -->
+             0    7.408032    0.617798
+             1   -4.361519   -1.032581
+ pspatm: atomic psp has been read  and splines computed
+
+   1.06155539E+02                                ecore*ucvol(ha*bohr**3)
+--------------------------------------------------------------------------------
+
+_setup2: Arith. and geom. avg. npw (full set) are     166.172     166.104
+
+================================================================================
+
+--- !BeginCycle
+iteration_state: {dtset: 1, }
+solver: {iscf: 7, nstep: 60, nline: 4, wfoptalg: 0, }
+tolerances: {tolvrs: 1.00E-12, }
+...
+
+     iter   Etot(hartree)      deltaE(h)  residm     vres2
+ ETOT  1  -18.556139160283    -1.856E+01 1.129E-02 6.880E+01
+ ETOT  2  -18.708615934441    -1.525E-01 1.496E-04 1.529E+00
+ ETOT  3  -18.709652080646    -1.036E-03 1.368E-04 5.864E-02
+ ETOT  4  -18.709672644364    -2.056E-05 2.281E-06 1.129E-02
+ ETOT  5  -18.709676510896    -3.867E-06 8.041E-07 1.274E-03
+ ETOT  6  -18.709676952620    -4.417E-07 1.895E-07 1.279E-05
+ ETOT  7  -18.709676957343    -4.723E-09 6.443E-09 2.214E-07
+ ETOT  8  -18.709676957398    -5.515E-11 2.940E-10 1.597E-08
+ ETOT  9  -18.709676957400    -1.847E-12 5.398E-11 1.727E-09
+ ETOT 10  -18.709676957401    -9.379E-13 4.274E-12 5.621E-11
+ ETOT 11  -18.709676957400     1.066E-13 6.746E-13 3.767E-13
+
+ At SCF step   11       vres2   =  3.77E-13 < tolvrs=  1.00E-12 =>converged.
+
+ Cartesian components of stress tensor (hartree/bohr^3)
+  sigma(1 1)= -4.20019187E-03  sigma(3 2)=  0.00000000E+00
+  sigma(2 2)=  2.66318426E-03  sigma(3 1)=  0.00000000E+00
+  sigma(3 3)=  2.66318426E-03  sigma(2 1)=  0.00000000E+00
+
+
+--- !ResultsGS
+iteration_state: {dtset: 1, }
+comment   : Summary of ground state results
+lattice_vectors:
+- [  7.5589045,   0.0000000,   0.0000000, ]
+- [  0.0000000,   7.5589045,   0.0000000, ]
+- [  0.0000000,   0.0000000,   7.5589045, ]
+lattice_lengths: [   7.55890,    7.55890,    7.55890, ]
+lattice_angles: [ 90.000,  90.000,  90.000, ] # degrees, (23, 13, 12)
+lattice_volume:   4.3189341E+02
+convergence: {deltae:  1.066E-13, res2:  3.767E-13, residm:  6.746E-13, diffor: null, }
+etotal    :  -1.87096770E+01
+entropy   :   0.00000000E+00
+fermie    :  -1.54320980E-01
+cartesian_stress_tensor: # hartree/bohr^3
+- [ -4.20019187E-03,   0.00000000E+00,   0.00000000E+00, ]
+- [  0.00000000E+00,   2.66318426E-03,   0.00000000E+00, ]
+- [  0.00000000E+00,   0.00000000E+00,   2.66318426E-03, ]
+pressure_GPa:  -1.1044E+01
+xred      :
+- [ -1.3750E-01,   0.0000E+00,   0.0000E+00,  N]
+- [  1.3750E-01,   0.0000E+00,   0.0000E+00,  N]
+cartesian_forces: # hartree/bohr
+- [ -1.13578924E+00,  -0.00000000E+00,  -0.00000000E+00, ]
+- [  1.13578924E+00,  -0.00000000E+00,  -0.00000000E+00, ]
+force_length_stats: {min:   1.13578924E+00, max:   1.13578924E+00, mean:   1.13578924E+00, }
+...
+
+ Integrated electronic density in atomic spheres:
+ ------------------------------------------------
+ Atom  Sphere_radius  Integrated_density
+    1        2.00000          5.38955350
+    2        2.00000          5.38955350
+================================================================================
+
+ ----iterations are completed or convergence reached----
+
+ Mean square residual over all n,k,spin=   74.042E-16; max=  67.458E-14
+ reduced coordinates (array xred) for    2 atoms
+      -0.137500000000      0.000000000000      0.000000000000
+       0.137500000000      0.000000000000      0.000000000000
+ rms dE/dt=  4.9567E+00; max dE/dt=  8.5853E+00; dE/dt below (all hartree)
+    1       8.585322430071      0.000000000000      0.000000000000
+    2      -8.585322430071      0.000000000000      0.000000000000
+
+ cartesian coordinates (angstrom) at end:
+    1     -0.55000000000000     0.00000000000000     0.00000000000000
+    2      0.55000000000000     0.00000000000000     0.00000000000000
+
+ cartesian forces (hartree/bohr) at end:
+    1     -1.13578924379140    -0.00000000000000    -0.00000000000000
+    2      1.13578924379140    -0.00000000000000    -0.00000000000000
+ frms,max,avg= 6.5574823E-01 1.1357892E+00   0.000E+00  0.000E+00  0.000E+00 h/b
+
+ cartesian forces (eV/Angstrom) at end:
+    1    -58.40463117273404    -0.00000000000000    -0.00000000000000
+    2     58.40463117273404    -0.00000000000000    -0.00000000000000
+ frms,max,avg= 3.3719930E+01 5.8404631E+01   0.000E+00  0.000E+00  0.000E+00 e/A
+ length scales=  7.558904503631  7.558904503631  7.558904503631 bohr
+              =  4.000000000000  4.000000000000  4.000000000000 angstroms
+ prteigrs : about to open file t86o_DS1_EIG
+ Fermi (or HOMO) energy (hartree) =  -0.15432   Average Vxc (hartree)=  -0.21667
+ Eigenvalues (hartree) for nkpt=  18  k points:
+ kpt#   1, nband= 10, wtk=  0.01563, kpt=  0.0000  0.0000  0.0000 (reduced coord)
+  -1.13865   -0.51356   -0.26149   -0.26149   -0.23328    0.07379    0.20319    0.20319
+   0.23908    0.34545
+ prteigrs : prtvol=0 or 1, do not print more k-points.
+
+
+--- !EnergyTerms
+iteration_state     : {dtset: 1, }
+comment             : Components of total free energy in Hartree
+kinetic             :  8.80533445256090E+00
+hartree             :  8.26085143175906E+00
+xc                  : -5.54937336639672E+00
+Ewald energy        : -6.15733626625436E+00
+psp_core            :  2.45791061680245E-01
+local_psp           : -2.56687559574568E+01
+non_local_psp       :  1.35381168670730E+00
+total_energy        : -1.87096769574004E+01
+total_energy_eV     : -5.09116246225354E+02
+band_energy         : -4.73233089830553E+00
+...
+
+
+ Cartesian components of stress tensor (hartree/bohr^3)
+  sigma(1 1)= -4.20019187E-03  sigma(3 2)=  0.00000000E+00
+  sigma(2 2)=  2.66318426E-03  sigma(3 1)=  0.00000000E+00
+  sigma(3 3)=  2.66318426E-03  sigma(2 1)=  0.00000000E+00
+
+-Cartesian components of stress tensor (GPa)         [Pressure= -1.1044E+01 GPa]
+- sigma(1 1)= -1.23573911E+02  sigma(3 2)=  0.00000000E+00
+- sigma(2 2)=  7.83535862E+01  sigma(3 1)=  0.00000000E+00
+- sigma(3 3)=  7.83535862E+01  sigma(2 1)=  0.00000000E+00
+
+================================================================================
+== DATASET  2 ==================================================================
+-   mpi_nproc: 1, omp_nthreads: -1 (-1 if OMP is not activated)
+
+
+--- !DatasetInfo
+iteration_state: {dtset: 2, }
+dimensions: {natom: 2, nkpt: 18, mband: 10, nsppol: 1, nspinor: 1, nspden: 1, mpw: 175, }
+cutoff_energies: {ecut:   4.0, pawecutdg:  -1.0, }
+electrons: {nelect:   1.00000000E+01, charge:   0.00000000E+00, occopt:   1.00000000E+00, tsmear:   1.00000000E-02, }
+meta: {optdriver: 11, }
+...
+
+ mkfilename : getwfk/=0, take file _WFK from output of DATASET   1.
+
+ Exchange-correlation functional for the present dataset will be:
+  Hartree-Fock with mixing coefficient alpha=1
+
+
+ RDMFT driver (code version 10.9.3)
+
+ RDMFT: orbitals read from t86o_DS1_WFK
+18 k-points, 10 bands, up to 175 plane waves, nelect = 10
+
+ RDMFT: time-reversal alignment of the orbitals at -k with those at k: largest 1-Re<psi_-k|Theta psi_k> =   2.00E+00 (k-point 9, band 4)
+ RDMFT: WARNING: the orbitals at -k are not the conjugates of the ones at k (up to a phase), for example in a degenerate shell.
+        The energy functionals only use K_pq and do not depend on this, but the occupations of k and -k are tied:
+        the pairing of degenerate states with different occupations is then ambiguous.
+
+ RDMFT: the orbitals of 6 k-points were replaced by the time-reversed ones of -k; alignment after the replacement:   9.99E-16
+
+
+ RDMFT: the ground-state WFK holds the irreducible BZ (kptopt 1): 18 k-points expanded to 64 k-points of the full BZ with the symmetry operations
+        (16 symmetry operations, 36 k-points obtained by rotation, the rest by time reversal)
+
+ RDMFT: bands per k-point: 10-10; plane waves per k-point (ecut): 159-175 (the bands are    6.0 % of the plane-wave basis)
+ RDMFT: the occupations and the orbital rotations are restricted to these bands (a variational restriction of the orbital space, the energies are upper bounds of the full-basis ones); use rdmft_complete = 1 to span the whole plane-wave basis.
+
+ RDMFT: maximum deviation from orthonormality of the orbitals =   1.7649E-09
+
+
+ RDMFT: symmetry reduction: reducible k-points (no band mixing by the little group) 56 of 64; the others are independent k-points
+312 of 2048 (k-point, operation) couples map the orbitals onto the orbitals of the image k-point (largest deviation  2.11E-15); 2148 classes of the 4096 pairs of k-points, independent pairs to compute: 1106 (  27.0 % of the pairs)
+ RDMFT: independent k-points of the orbital optimization: 18 of 64
+   not reduced: k-point     1 (  0.00000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     2 (  0.25000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     3 (  0.50000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     4 ( -0.25000 -0.00000 -0.00000) degenerate band pairs: 2
+   not reduced: k-point    41 (  0.00000  0.50000  0.50000) degenerate band pairs: 3
+   not reduced: k-point    42 (  0.25000  0.50000  0.50000) degenerate band pairs: 3
+   not reduced: k-point    43 (  0.50000  0.50000  0.50000) degenerate band pairs: 2
+   not reduced: k-point    44 ( -0.25000 -0.50000 -0.50000) degenerate band pairs: 3
+
+
+
+--- Pseudopotential description ------------------------------------------------
+- pspini: atom type   1  psp file is /home/marm314/Installers/abinit/abinit/tests/Pspdir/Psdj_nc_sr_04_pw_std_psp8/N.psp8
+- pspatm: opening atomic psp file    /home/marm314/Installers/abinit/abinit/tests/Pspdir/Psdj_nc_sr_04_pw_std_psp8/N.psp8
+- N     ONCVPSP-3.3.0  r_core=   1.20551   1.35824
+-  7.00000   5.00000    171101                znucl, zion, pspdat
+    8   -1012    1    4       600   0.00000   pspcod,pspxc,lmax,lloc,mmax,r2well
+    5.99000000000000    4.00000000000000    0.00000000000000   rchrg,fchrg,qchrg
+     nproj     2     2
+     extension_switch     1
+  pspatm : epsatm=    5.30777697
+         --- l  ekb(1:nproj) -->
+             0    7.408032    0.617798
+             1   -4.361519   -1.032581
+ pspatm: atomic psp has been read  and splines computed
+
+--------------------------------------------------------------------------------
+
+
+ RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
+
+ RDMFT: no table of subspaces invariant under the symmetry operations (code 1): the symmetry reduction is not used, only time reversal.
+
+
+ RDMFT: active space over all k-points:  frozen occupied = 0, active occupied = 320, active virtual = 320, frozen virtual = 0
+
+
+ RDMFT: J and K integrals computed in the active space, number of free orbitals = 640, background orbitals = 0, total orbitals = 640
+
+
+ RDMFT: kinetic energy                              =   8.80533445256106E+00
+ RDMFT: one-electron energy (T + Vloc + Vnl)        =  -1.55096098181880E+01
+ RDMFT: Ewald energy                                =  -6.15733626625436E+00
+ RDMFT: core pseudopotential energy                 =   2.45791061680245E-01
+ RDMFT: Hartree + exchange                          =   4.33339352877310E+00
+ RDMFT: total energy (SD, ground-state occ.)        =  -1.70877614939890E+01
+
+ RDMFT: sum over occupied orbitals of (K_pp - J_pp) / N_k^2 =   3.916284E-01 Ha
+
+ RDMFT: all the functionals evaluated with the ground-state occupations (rdmft_selfint = 1; total energy, difference with SD):
+   SD         -1.70877614939891E+01  diff = -6.75E-14
+   MBB        -1.70877614939891E+01  diff = -6.75E-14
+   CA         -1.70877614939891E+01  diff = -6.75E-14
+   RHFB       -1.70877614939891E+01  diff = -6.75E-14
+   CGA        -1.70877614939891E+01  diff = -6.75E-14
+   ML         -1.70877616618550E+01  diff = -1.68E-07
+   MLSIC      -1.70877595613678E+01  diff =  1.93E-06
+   GU         -1.70877614939891E+01  diff = -6.75E-14
+   POWER      -1.70877614939891E+01  diff = -6.75E-14
+   MULLER_AS  -2.14211550227621E+01  diff = -4.33E+00
+ RDMFT: PNOF functionals skipped: no active occupied orbital or not enough virtual orbitals for rdmft_ncoupl (increase nband of the ground-state calculation or decrease rdmft_nocc_act/rdmft_ncoupl).
+
+
+================================================================================
+== DATASET  3 ==================================================================
+-   mpi_nproc: 1, omp_nthreads: -1 (-1 if OMP is not activated)
+
+
+--- !DatasetInfo
+iteration_state: {dtset: 3, }
+dimensions: {natom: 2, nkpt: 18, mband: 10, nsppol: 1, nspinor: 1, nspden: 1, mpw: 175, }
+cutoff_energies: {ecut:   4.0, pawecutdg:  -1.0, }
+electrons: {nelect:   1.00000000E+01, charge:   0.00000000E+00, occopt:   1.00000000E+00, tsmear:   1.00000000E-02, }
+meta: {optdriver: 11, }
+...
+
+ mkfilename : getwfk/=0, take file _WFK from output of DATASET   1.
+
+ Exchange-correlation functional for the present dataset will be:
+  Hartree-Fock with mixing coefficient alpha=1
+
+
+ RDMFT driver (code version 10.9.3)
+
+ RDMFT: orbitals read from t86o_DS1_WFK
+18 k-points, 10 bands, up to 175 plane waves, nelect = 10
+
+ RDMFT: time-reversal alignment of the orbitals at -k with those at k: largest 1-Re<psi_-k|Theta psi_k> =   2.00E+00 (k-point 9, band 4)
+ RDMFT: WARNING: the orbitals at -k are not the conjugates of the ones at k (up to a phase), for example in a degenerate shell.
+        The energy functionals only use K_pq and do not depend on this, but the occupations of k and -k are tied:
+        the pairing of degenerate states with different occupations is then ambiguous.
+
+ RDMFT: the orbitals of 6 k-points were replaced by the time-reversed ones of -k; alignment after the replacement:   9.99E-16
+
+
+ RDMFT: the ground-state WFK holds the irreducible BZ (kptopt 1): 18 k-points expanded to 64 k-points of the full BZ with the symmetry operations
+        (16 symmetry operations, 36 k-points obtained by rotation, the rest by time reversal)
+
+ RDMFT: bands per k-point: 10-10; plane waves per k-point (ecut): 159-175 (the bands are    6.0 % of the plane-wave basis)
+ RDMFT: the occupations and the orbital rotations are restricted to these bands (a variational restriction of the orbital space, the energies are upper bounds of the full-basis ones); use rdmft_complete = 1 to span the whole plane-wave basis.
+
+ RDMFT: maximum deviation from orthonormality of the orbitals =   1.7649E-09
+
+--------------------------------------------------------------------------------
+
+
+ RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
+
+
+ RDMFT: active space over all k-points:  frozen occupied = 0, active occupied = 320, active virtual = 320, frozen virtual = 0
+
+
+ RDMFT: J and K integrals computed in the active space, number of free orbitals = 640, background orbitals = 0, total orbitals = 640
+
+
+ RDMFT: kinetic energy                              =   8.80533445256106E+00
+ RDMFT: one-electron energy (T + Vloc + Vnl)        =  -1.55096098181880E+01
+ RDMFT: Ewald energy                                =  -6.15733626625436E+00
+ RDMFT: core pseudopotential energy                 =   2.45791061680245E-01
+ RDMFT: Hartree + exchange                          =   4.33339352877310E+00
+ RDMFT: total energy (SD, ground-state occ.)        =  -1.70877614939890E+01
+
+ RDMFT: sum over occupied orbitals of (K_pp - J_pp) / N_k^2 =   3.916284E-01 Ha
+
+ RDMFT: all the functionals evaluated with the ground-state occupations (rdmft_selfint = 1; total energy, difference with SD):
+   SD         -1.70877614939891E+01  diff = -6.75E-14
+   MBB        -1.70877614939891E+01  diff = -6.75E-14
+   CA         -1.70877614939891E+01  diff = -6.75E-14
+   RHFB       -1.70877614939891E+01  diff = -6.75E-14
+   CGA        -1.70877614939891E+01  diff = -6.75E-14
+   ML         -1.70877616618550E+01  diff = -1.68E-07
+   MLSIC      -1.70877595613678E+01  diff =  1.93E-06
+   GU         -1.70877614939891E+01  diff = -6.75E-14
+   POWER      -1.70877614939891E+01  diff = -6.75E-14
+   MULLER_AS  -2.14211550227621E+01  diff = -4.33E+00
+ RDMFT: PNOF functionals skipped: no active occupied orbital or not enough virtual orbitals for rdmft_ncoupl (increase nband of the ground-state calculation or decrease rdmft_nocc_act/rdmft_ncoupl).
+
+
+================================================================================
+== DATASET  4 ==================================================================
+-   mpi_nproc: 1, omp_nthreads: -1 (-1 if OMP is not activated)
+
+
+--- !DatasetInfo
+iteration_state: {dtset: 4, }
+dimensions: {natom: 2, nkpt: 18, mband: 10, nsppol: 1, nspinor: 1, nspden: 1, mpw: 175, }
+cutoff_energies: {ecut:   4.0, pawecutdg:  -1.0, }
+electrons: {nelect:   1.00000000E+01, charge:   0.00000000E+00, occopt:   1.00000000E+00, tsmear:   1.00000000E-02, }
+meta: {optdriver: 11, }
+...
+
+ mkfilename : getwfk/=0, take file _WFK from output of DATASET   1.
+
+ Exchange-correlation functional for the present dataset will be:
+  Hartree-Fock with mixing coefficient alpha=1
+
+
+ RDMFT driver (code version 10.9.3)
+
+ RDMFT: orbitals read from t86o_DS1_WFK
+18 k-points, 10 bands, up to 175 plane waves, nelect = 10
+
+ RDMFT: time-reversal alignment of the orbitals at -k with those at k: largest 1-Re<psi_-k|Theta psi_k> =   2.00E+00 (k-point 9, band 4)
+ RDMFT: WARNING: the orbitals at -k are not the conjugates of the ones at k (up to a phase), for example in a degenerate shell.
+        The energy functionals only use K_pq and do not depend on this, but the occupations of k and -k are tied:
+        the pairing of degenerate states with different occupations is then ambiguous.
+
+ RDMFT: the orbitals of 6 k-points were replaced by the time-reversed ones of -k; alignment after the replacement:   9.99E-16
+
+
+ RDMFT: the ground-state WFK holds the irreducible BZ (kptopt 1): 18 k-points expanded to 64 k-points of the full BZ with the symmetry operations
+        (16 symmetry operations, 36 k-points obtained by rotation, the rest by time reversal)
+
+ RDMFT: bands per k-point: 10-10; plane waves per k-point (ecut): 159-175 (the bands are    6.0 % of the plane-wave basis)
+ RDMFT: the occupations and the orbital rotations are restricted to these bands (a variational restriction of the orbital space, the energies are upper bounds of the full-basis ones); use rdmft_complete = 1 to span the whole plane-wave basis.
+
+ RDMFT: maximum deviation from orthonormality of the orbitals =   1.7649E-09
+
+
+ RDMFT: symmetry reduction: reducible k-points (no band mixing by the little group) 56 of 64; the others are independent k-points
+312 of 2048 (k-point, operation) couples map the orbitals onto the orbitals of the image k-point (largest deviation  2.11E-15); 2148 classes of the 4096 pairs of k-points, independent pairs to compute: 1106 (  27.0 % of the pairs)
+ RDMFT: independent k-points of the orbital optimization: 18 of 64
+   not reduced: k-point     1 (  0.00000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     2 (  0.25000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     3 (  0.50000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     4 ( -0.25000 -0.00000 -0.00000) degenerate band pairs: 2
+   not reduced: k-point    41 (  0.00000  0.50000  0.50000) degenerate band pairs: 3
+   not reduced: k-point    42 (  0.25000  0.50000  0.50000) degenerate band pairs: 3
+   not reduced: k-point    43 (  0.50000  0.50000  0.50000) degenerate band pairs: 2
+   not reduced: k-point    44 ( -0.25000 -0.50000 -0.50000) degenerate band pairs: 3
+
+
+--------------------------------------------------------------------------------
+
+
+ RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
+
+
+ RDMFT: active space over all k-points:  frozen occupied = 256, active occupied = 64, active virtual = 320, frozen virtual = 0
+
+
+ RDMFT: J and K integrals computed in the active space, number of free orbitals = 137, background orbitals = 256, total orbitals = 640
+
+
+ RDMFT: kinetic energy                              =   8.80533445256106E+00
+ RDMFT: one-electron energy (T + Vloc + Vnl)        =  -1.55096098181880E+01
+ RDMFT: Ewald energy                                =  -6.15733626625436E+00
+ RDMFT: core pseudopotential energy                 =   2.45791061680245E-01
+ RDMFT: Hartree + exchange                          =   4.33339352877317E+00
+ RDMFT: total energy (SD, ground-state occ.)        =  -1.70877614939889E+01
+
+ RDMFT: sum over occupied orbitals of (K_pp - J_pp) / N_k^2 =   3.916284E-01 Ha
+
+ RDMFT: functional evaluated with the ground-state occupations (rdmft_selfint = 1; total energy, difference with SD):
+   GNOF       (rdmft_ncoupl=2) -1.70877614939889E+01  diff = -1.07E-14
+
+ RDMFT: occupation numbers optimized for the functional 24 (converged = T)
+ RDMFT: optimized total energy                      =  -1.71017897983074E+01
+ RDMFT: energy with the ground-state occupations    =  -1.70877614939889E+01
+ RDMFT: optimized - ground state                    =  -1.40283043185079E-02
+ RDMFT: number of iterations = 34; sum of the occupations of the free orbitals =   6.400000E+01
+
+ RDMFT: optimized occupation numbers (spin summed, between 0 and 2), k-point by k-point:
+ Occupations at the k-point (reduced coordinates):    0.00000   0.00000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98431   0.01011   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99442
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.00000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.99112   0.00888   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.00000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98989   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98989
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.00000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.99112   0.00888   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.50000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98217   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98217
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.50000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.50000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98391   0.01609   0.01783   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01783
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.50000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.00000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.00000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98217   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98217
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.00000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.00000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98391   0.01609   0.01783   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01783
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.00000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.50000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98433   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98433
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.50000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.97664   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.97664
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.50000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.97124   0.01569   0.01567   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00259
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.50000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.97664   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.97664
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):   -0.00000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.50000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ RDMFT: total averaged occupation, all k-points     =          10.0000000000
+ RDMFT: number of electrons (nelect)                =          10.0000000000
+ RDMFT: integrated electron density                 =          10.0000000000
+ RDMFT: integral of |rho - rho(ground state)|       =           0.0166503125
+ RDMFT: maximum of the density (e/bohr^3)           =       4.6117224031E-01
+ RDMFT: minimum of the density (e/bohr^3)           =       1.2155507246E-04
+ RDMFT: sum_p n_p (1 - n_p), 0 for one determinant  =       1.4187820364E-02
+ RDMFT: orbitals with n=1 / fractional / n=0        = 256 137 247
+
+ RDMFT: energy components (Ha) of the optimized state, and change with respect to the starting state (SD, ground-state occupations)
+ RDMFT: kinetic energy                          8.79736077976795E+00 -7.97367279310457E-03
+ RDMFT: one-electron energy (T + Vloc + Vnl)   -1.54942454611583E+01  1.53643570296662E-02
+ RDMFT: Hartree energy                          8.24642129752388E+00 -1.44301342348143E-02
+ RDMFT: exchange (functional) energy           -3.94242043009887E+00 -1.49625271133438E-02
+ RDMFT: Ewald energy                           -6.15733626625436E+00  0.00000000000000E+00
+ RDMFT: core pseudopotential energy             2.45791061680245E-01  0.00000000000000E+00
+ RDMFT: total energy                           -1.71017897983074E+01 -1.40283043184901E-02
+ RDMFT: sum of the components - total energy    1.77635683940025E-14
+
+
+ RDMFT: natural orbitals written to t86o_DS4_WFK (occupations 2n; the eigenvalues are the diagonal elements of the one-electron Hamiltonian)
+
+ RDMFT: optimized occupations written in t86o_DS4_RDMFT_OCC
+ RDMFT: restart file written in t86o_DS4_RDMFT_RESTART (to be used with the WFK file and rdmft_restart = 1)
+
+================================================================================
+== DATASET  5 ==================================================================
+-   mpi_nproc: 1, omp_nthreads: -1 (-1 if OMP is not activated)
+
+
+--- !DatasetInfo
+iteration_state: {dtset: 5, }
+dimensions: {natom: 2, nkpt: 18, mband: 10, nsppol: 1, nspinor: 1, nspden: 1, mpw: 175, }
+cutoff_energies: {ecut:   4.0, pawecutdg:  -1.0, }
+electrons: {nelect:   1.00000000E+01, charge:   0.00000000E+00, occopt:   1.00000000E+00, tsmear:   1.00000000E-02, }
+meta: {optdriver: 11, }
+...
+
+ mkfilename : getwfk/=0, take file _WFK from output of DATASET   1.
+
+ Exchange-correlation functional for the present dataset will be:
+  Hartree-Fock with mixing coefficient alpha=1
+
+
+ RDMFT driver (code version 10.9.3)
+
+ RDMFT: orbitals read from t86o_DS1_WFK
+18 k-points, 10 bands, up to 175 plane waves, nelect = 10
+
+ RDMFT: time-reversal alignment of the orbitals at -k with those at k: largest 1-Re<psi_-k|Theta psi_k> =   2.00E+00 (k-point 9, band 4)
+ RDMFT: WARNING: the orbitals at -k are not the conjugates of the ones at k (up to a phase), for example in a degenerate shell.
+        The energy functionals only use K_pq and do not depend on this, but the occupations of k and -k are tied:
+        the pairing of degenerate states with different occupations is then ambiguous.
+
+ RDMFT: the orbitals of 6 k-points were replaced by the time-reversed ones of -k; alignment after the replacement:   9.99E-16
+
+
+ RDMFT: the ground-state WFK holds the irreducible BZ (kptopt 1): 18 k-points expanded to 64 k-points of the full BZ with the symmetry operations
+        (16 symmetry operations, 36 k-points obtained by rotation, the rest by time reversal)
+
+ RDMFT: bands per k-point: 10-10; plane waves per k-point (ecut): 159-175 (the bands are    6.0 % of the plane-wave basis)
+ RDMFT: the occupations and the orbital rotations are restricted to these bands (a variational restriction of the orbital space, the energies are upper bounds of the full-basis ones); use rdmft_complete = 1 to span the whole plane-wave basis.
+
+ RDMFT: maximum deviation from orthonormality of the orbitals =   1.7649E-09
+
+
+ RDMFT: symmetry reduction: reducible k-points (no band mixing by the little group) 56 of 64; the others are independent k-points
+312 of 2048 (k-point, operation) couples map the orbitals onto the orbitals of the image k-point (largest deviation  2.11E-15); 2148 classes of the 4096 pairs of k-points, independent pairs to compute: 1106 (  27.0 % of the pairs)
+ RDMFT: independent k-points of the orbital optimization: 18 of 64
+   not reduced: k-point     1 (  0.00000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     2 (  0.25000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     3 (  0.50000  0.00000  0.00000) degenerate band pairs: 2
+   not reduced: k-point     4 ( -0.25000 -0.00000 -0.00000) degenerate band pairs: 2
+   not reduced: k-point    41 (  0.00000  0.50000  0.50000) degenerate band pairs: 3
+   not reduced: k-point    42 (  0.25000  0.50000  0.50000) degenerate band pairs: 3
+   not reduced: k-point    43 (  0.50000  0.50000  0.50000) degenerate band pairs: 2
+   not reduced: k-point    44 ( -0.25000 -0.50000 -0.50000) degenerate band pairs: 3
+
+
+--------------------------------------------------------------------------------
+
+
+ RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
+
+
+ RDMFT: active space over all k-points:  frozen occupied = 256, active occupied = 64, active virtual = 320, frozen virtual = 0
+
+
+ RDMFT: J and K integrals computed in the active space, number of free orbitals = 137, background orbitals = 256, total orbitals = 640
+
+
+ RDMFT: kinetic energy                              =   8.80533445256106E+00
+ RDMFT: one-electron energy (T + Vloc + Vnl)        =  -1.55096098181880E+01
+ RDMFT: Ewald energy                                =  -6.15733626625436E+00
+ RDMFT: core pseudopotential energy                 =   2.45791061680245E-01
+ RDMFT: Hartree + exchange                          =   4.33339352877312E+00
+ RDMFT: total energy (SD, ground-state occ.)        =  -1.70877614939890E+01
+
+ RDMFT: sum over occupied orbitals of (K_pp - J_pp) / N_k^2 =   3.916284E-01 Ha
+
+ RDMFT: functional evaluated with the ground-state occupations (rdmft_selfint = 1; total energy, difference with SD):
+   GNOF       (rdmft_ncoupl=2) -1.70877614939890E+01  diff = -1.07E-14
+
+ RDMFT: occupation numbers optimized for the functional 24 (converged = T)
+ RDMFT: optimized total energy                      =  -1.71017897983075E+01
+ RDMFT: energy with the ground-state occupations    =  -1.70877614939890E+01
+ RDMFT: optimized - ground state                    =  -1.40283043185079E-02
+ RDMFT: number of iterations = 34; sum of the occupations of the free orbitals =   6.400000E+01
+
+ RDMFT: optimized occupation numbers (spin summed, between 0 and 2), k-point by k-point:
+ Occupations at the k-point (reduced coordinates):    0.00000   0.00000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98431   0.01011   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99442
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.00000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.99112   0.00888   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.00000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98989   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98989
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.00000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.99112   0.00888   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.50000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98217   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98217
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.50000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.50000   0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98391   0.01609   0.01783   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01783
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.50000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000  -0.00000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.00000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.50000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.00000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000   0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.00000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98217   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98217
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.00000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.00000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98391   0.01609   0.01783   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01783
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.00000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98552   0.01448   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):    0.00000   0.50000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98433   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98433
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.50000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.97664   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.97664
+
+ Occupations at the k-point (reduced coordinates):    0.50000   0.50000   0.50000
+    2.00000   2.00000   2.00000   2.00000   1.97124   0.01569   0.01567   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00259
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.50000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.97664   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.97664
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000  -0.50000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.97830   0.00926   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98756
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98445   0.01555   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.00000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98455   0.01128   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.99582
+
+ Occupations at the k-point (reduced coordinates):   -0.00000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.50000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000   0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98395   0.00000   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:    9.98395
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99074   0.00719   0.01605   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01399
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.50000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98872   0.01545   0.01085   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01503
+
+ Occupations at the k-point (reduced coordinates):   -0.00000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.99310   0.00690   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):    0.25000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ Occupations at the k-point (reduced coordinates):   -0.50000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98456   0.01544   0.01168   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.01168
+
+ Occupations at the k-point (reduced coordinates):   -0.25000  -0.25000  -0.25000
+    2.00000   2.00000   2.00000   2.00000   1.98741   0.01259   0.00000   0.00000   0.00000   0.00000
+ Total occ. from band     1 to   10 at current k-point:   10.00000
+
+ RDMFT: total averaged occupation, all k-points     =          10.0000000000
+ RDMFT: number of electrons (nelect)                =          10.0000000000
+ RDMFT: integrated electron density                 =          10.0000000000
+ RDMFT: integral of |rho - rho(ground state)|       =           0.0166503125
+ RDMFT: maximum of the density (e/bohr^3)           =       4.6117224031E-01
+ RDMFT: minimum of the density (e/bohr^3)           =       1.2155507246E-04
+ RDMFT: sum_p n_p (1 - n_p), 0 for one determinant  =       1.4187820364E-02
+ RDMFT: orbitals with n=1 / fractional / n=0        = 256 137 247
+
+ RDMFT: energy components (Ha) of the optimized state, and change with respect to the starting state (SD, ground-state occupations)
+ RDMFT: kinetic energy                          8.79736077976795E+00 -7.97367279310457E-03
+ RDMFT: one-electron energy (T + Vloc + Vnl)   -1.54942454611583E+01  1.53643570296662E-02
+ RDMFT: Hartree energy                          8.24642129752388E+00 -1.44301342348143E-02
+ RDMFT: exchange (functional) energy           -3.94242043009892E+00 -1.49625271133438E-02
+ RDMFT: Ewald energy                           -6.15733626625436E+00  0.00000000000000E+00
+ RDMFT: core pseudopotential energy             2.45791061680245E-01  0.00000000000000E+00
+ RDMFT: total energy                           -1.71017897983075E+01 -1.40283043184901E-02
+ RDMFT: sum of the components - total energy    1.77635683940025E-14
+
+
+ RDMFT: natural orbitals written to t86o_DS5_WFK (occupations 2n; the eigenvalues are the diagonal elements of the one-electron Hamiltonian)
+
+ RDMFT: optimized occupations written in t86o_DS5_RDMFT_OCC
+ RDMFT: restart file written in t86o_DS5_RDMFT_RESTART (to be used with the WFK file and rdmft_restart = 1)
+
+== END DATASET(S) ==============================================================
+================================================================================
+  
+ -outvars: echo values of variables after computation  --------
+            acell      7.5589045036E+00  7.5589045036E+00  7.5589045036E+00 Bohr
+              amu      1.40067400E+01
+             ecut      4.00000000E+00 Hartree
+           etotal1    -1.8709676957E+01
+           etotal2     0.0000000000E+00
+           etotal3     0.0000000000E+00
+           etotal4     0.0000000000E+00
+           etotal5     0.0000000000E+00
+            fcart1    -1.1357892438E+00 -0.0000000000E+00 -0.0000000000E+00
+                       1.1357892438E+00 -0.0000000000E+00 -0.0000000000E+00
+            fcart2     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+            fcart3     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+            fcart4     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+            fcart5     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+-          fftalg         112
+    fock_icutcoul1          0
+    fock_icutcoul2          3
+    fock_icutcoul3          3
+    fock_icutcoul4          3
+    fock_icutcoul5          3
+           getwfk1          0
+           getwfk2          1
+           getwfk3          1
+           getwfk4          1
+           getwfk5          1
+           istwfk        1    0    1    0    0    0    1    0    1    0
+                         0    0    0    0    0    1    0    1
+              ixc1         11
+              ixc2         40
+              ixc3         40
+              ixc4         40
+              ixc5         40
+           jdtset        1    2    3    4    5
+              kpt      0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+         kptns_hf2     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+         kptns_hf3     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+         kptns_hf4     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+         kptns_hf5     0.00000000E+00  0.00000000E+00  0.00000000E+00
+                       2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       5.00000000E-01  0.00000000E+00  0.00000000E+00
+                      -2.50000000E-01  0.00000000E+00  0.00000000E+00
+                       0.00000000E+00  2.50000000E-01  0.00000000E+00
+                       2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       5.00000000E-01  2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01  2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  5.00000000E-01  0.00000000E+00
+                       2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       5.00000000E-01  5.00000000E-01  0.00000000E+00
+                      -2.50000000E-01  5.00000000E-01  0.00000000E+00
+                       0.00000000E+00 -2.50000000E-01  0.00000000E+00
+                       2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       5.00000000E-01 -2.50000000E-01  0.00000000E+00
+                      -2.50000000E-01 -2.50000000E-01  0.00000000E+00
+                       0.00000000E+00  0.00000000E+00  2.50000000E-01
+                       2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       5.00000000E-01  0.00000000E+00  2.50000000E-01
+                      -2.50000000E-01  0.00000000E+00  2.50000000E-01
+                       0.00000000E+00  2.50000000E-01  2.50000000E-01
+                       2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       5.00000000E-01  2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01  2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  5.00000000E-01  2.50000000E-01
+                       2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       5.00000000E-01  5.00000000E-01  2.50000000E-01
+                      -2.50000000E-01  5.00000000E-01  2.50000000E-01
+                       0.00000000E+00 -2.50000000E-01  2.50000000E-01
+                       2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       5.00000000E-01 -2.50000000E-01  2.50000000E-01
+                      -2.50000000E-01 -2.50000000E-01  2.50000000E-01
+                       0.00000000E+00  0.00000000E+00  5.00000000E-01
+                       2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       5.00000000E-01  0.00000000E+00  5.00000000E-01
+                      -2.50000000E-01  0.00000000E+00  5.00000000E-01
+                       0.00000000E+00  2.50000000E-01  5.00000000E-01
+                       2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       5.00000000E-01  2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01  2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  5.00000000E-01  5.00000000E-01
+                       2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       5.00000000E-01  5.00000000E-01  5.00000000E-01
+                      -2.50000000E-01  5.00000000E-01  5.00000000E-01
+                       0.00000000E+00 -2.50000000E-01  5.00000000E-01
+                       2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       5.00000000E-01 -2.50000000E-01  5.00000000E-01
+                      -2.50000000E-01 -2.50000000E-01  5.00000000E-01
+                       0.00000000E+00  0.00000000E+00 -2.50000000E-01
+                       2.50000000E-01  0.00000000E+00 -2.50000000E-01
+                       outvar_i_n : Printing only first  50 k-points.
+         kptrlatt        4    0    0      0    4    0      0    0    4
+          kptrlen      3.02356180E+01
+P           mkmem          18
+            natom           2
+            nband          10
+          nbandhf           5
+           ndtset           5
+            ngfft          15      15      15
+             nkpt          18
+           nkpthf          64
+            nstep          60
+             nsym          16
+           ntypat           1
+              occ      2.000000  2.000000  2.000000  2.000000  2.000000  0.000000
+                       0.000000  0.000000  0.000000  0.000000
+        optdriver1          0
+        optdriver2         11
+        optdriver3         11
+        optdriver4         11
+        optdriver5         11
+        optstress1          1
+        optstress2          0
+        optstress3          0
+        optstress4          0
+        optstress5          0
+           prtden1          1
+           prtden2          0
+           prtden3          0
+           prtden4          0
+           prtden5          0
+ rdmft_sym_reduce1          1
+ rdmft_sym_reduce2          1
+ rdmft_sym_reduce3          0
+ rdmft_sym_reduce4          1
+ rdmft_sym_reduce5          2
+ rdmft_functional1          0
+ rdmft_functional2          0
+ rdmft_functional3          0
+ rdmft_functional4         24
+ rdmft_functional5         24
+   rdmft_nocc_act1          0
+   rdmft_nocc_act2          0
+   rdmft_nocc_act3          0
+   rdmft_nocc_act4          1
+   rdmft_nocc_act5          1
+    rdmft_selfint1          0
+    rdmft_selfint2          1
+    rdmft_selfint3          1
+    rdmft_selfint4          1
+    rdmft_selfint5          1
+          spgroup         123
+           strten1    -4.2001918721E-03  2.6631842645E-03  2.6631842645E-03
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+           strten2     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+           strten3     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+           strten4     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+           strten5     0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+                       0.0000000000E+00  0.0000000000E+00  0.0000000000E+00
+           symrel      1  0  0   0  1  0   0  0  1      -1  0  0   0 -1  0   0  0 -1
+                      -1  0  0   0  1  0   0  0 -1       1  0  0   0 -1  0   0  0  1
+                      -1  0  0   0 -1  0   0  0  1       1  0  0   0  1  0   0  0 -1
+                       1  0  0   0 -1  0   0  0 -1      -1  0  0   0  1  0   0  0  1
+                       1  0  0   0  0  1   0  1  0      -1  0  0   0  0 -1   0 -1  0
+                      -1  0  0   0  0  1   0 -1  0       1  0  0   0  0 -1   0  1  0
+                      -1  0  0   0  0 -1   0  1  0       1  0  0   0  0  1   0 -1  0
+                       1  0  0   0  0 -1   0 -1  0      -1  0  0   0  0  1   0  1  0
+           tolvrs      1.00000000E-12
+            typat      1  1
+          usefock1          0
+          usefock2          1
+          usefock3          1
+          usefock4          1
+          usefock5          1
+              wtk        0.01563    0.03125    0.01563    0.06250    0.12500    0.06250
+                         0.03125    0.06250    0.03125    0.06250    0.12500    0.06250
+                         0.06250    0.12500    0.06250    0.01563    0.03125    0.01563
+           xangst     -5.5000000000E-01  0.0000000000E+00  0.0000000000E+00
+                       5.5000000000E-01  0.0000000000E+00  0.0000000000E+00
+            xcart     -1.0393493692E+00  0.0000000000E+00  0.0000000000E+00
+                       1.0393493692E+00  0.0000000000E+00  0.0000000000E+00
+             xred     -1.3750000000E-01  0.0000000000E+00  0.0000000000E+00
+                       1.3750000000E-01  0.0000000000E+00  0.0000000000E+00
+            znucl        7.00000
+
+================================================================================
+
+
+- Timing analysis has been suppressed with timopt=0
+
+
+
+================================================================================
+
+ Suggested references for the acknowledgment of ABINIT usage.
+
+ The users of ABINIT have little formal obligations with respect to the ABINIT group
+ (those specified in the GNU General Public License, http://www.gnu.org/copyleft/gpl.txt).
+ However, it is common practice in the scientific literature,
+ to acknowledge the efforts of people that have made the research possible.
+ In this spirit, please find below suggested citations of work written by ABINIT developers,
+ corresponding to implementations inside of ABINIT that you have used in the present run.
+ Note also that it will be of great value to readers of publications presenting these results,
+ to read papers enabling them to understand the theoretical formalism and details
+ of the ABINIT implementation.
+ For information on why they are suggested, see also https://docs.abinit.org/theory/acknowledgments.
+-
+- [1] Abinit 2025: New Capabilities for the Predictive Modeling of Solids and Nanomaterials.
+- J. Chem. Phys. 163, 164126 (2025).
+- M.J. Verstraete, J. Abreu, G. Allemand, B. Amadon, G. Antonius,
+- M. Azizi, L. Baguet, C. Barat, L. Bastogne, R. Bejaud, J.-M. Beuken,
+- J. Bieder, A. Blanchet, F. Bottin, J. Bouchet, J. Bouquiaux, E. Bousquet,
+- J. Boust, F. Brieuc, V. Brousseau-Couture, N. Brouwer, F. Bruneval,
+- A. Castellano, E. Castiel, J.-B. Charraud, J. Clerouin, M. Cote, C. Duval,
+- A. Gallo, F. Gendron, G. Geneste, Ph. Ghosez, M. Giantomassi, O. Gingras,
+- F. Gomez-Ortiz, X. Gonze, F. Goudreault, A. Gruneis, R. Gupta, B. Guster,
+- D.R. Hamann, Xu He, O. Hellman, N. Holzwarth, F. Jollet, P. Kestener,
+- I.-M. Lygatsika, O. Nadeau, L. MacEnulty, E. Mara
+- Comment: the sixth generic paper describing the ABINIT project.
+- Note that a version of this paper, that is not formatted for J. Chem. Phys. 
+- is available at
+- https://github.com/abinit/abinit_assets/tree/main/abinit_package/papers/ABINIT25.pdf .
+- The licence allows the authors to put it on the Web.
+- DOI and bibtex: see https://docs.abinit.org/theory/bibliography/#verstraete2025
+-
+- [2] Optimized norm-conserving Vanderbilt pseudopotentials.
+- D.R. Hamann, Phys. Rev. B 88, 085117 (2013).
+- Comment: Some pseudopotential generated using the ONCVPSP code were used.
+- DOI and bibtex: see https://docs.abinit.org/theory/bibliography/#hamann2013
+-
+- [3] The Abinit project: Impact, environment and recent developments.
+- Computer Phys. Comm. 248, 107042 (2020).
+- X.Gonze, B. Amadon, G. Antonius, F.Arnardi, L.Baguet, J.-M.Beuken,
+- J.Bieder, F.Bottin, J.Bouchet, E.Bousquet, N.Brouwer, F.Bruneval,
+- G.Brunin, T.Cavignac, J.-B. Charraud, Wei Chen, M.Cote, S.Cottenier,
+- J.Denier, G.Geneste, Ph.Ghosez, M.Giantomassi, Y.Gillet, O.Gingras,
+- D.R.Hamann, G.Hautier, Xu He, N.Helbig, N.Holzwarth, Y.Jia, F.Jollet,
+- W.Lafargue-Dit-Hauret, K.Lejaeghere, M.A.L.Marques, A.Martin, C.Martins,
+- H.P.C. Miranda, F.Naccarato, K. Persson, G.Petretto, V.Planes, Y.Pouillon,
+- S.Prokhorenko, F.Ricci, G.-M.Rignanese, A.H.Romero, M.M.Schmitt, M.Torrent,
+- M.J.van Setten, B.Van Troeye, M.J.Verstraete, G.Zerah and J.W.Zwanzig
+- Comment: the fifth generic paper describing the ABINIT project.
+- Note that a version of this paper, that is not formatted for Computer Phys. Comm. 
+- is available at
+- https://github.com/abinit/abinit_assets/tree/main/abinit_package/papers/ABINIT20.pdf .
+- The licence allows the authors to put it on the Web.
+- DOI and bibtex: see https://docs.abinit.org/theory/bibliography/#gonze2020
+-
+- [4] The Abinit project: Impact, environment and recent developments.
+- Computer Phys. Comm. 248, 107042 (2020).
+- X.Gonze, B. Amadon, G. Antonius, F.Arnardi, L.Baguet, J.-M.Beuken,
+- J.Bieder, F.Bottin, J.Bouchet, E.Bousquet, N.Brouwer, F.Bruneval,
+- G.Brunin, T.Cavignac, J.-B. Charraud, Wei Chen, M.Cote, S.Cottenier,
+- J.Denier, G.Geneste, Ph.Ghosez, M.Giantomassi, Y.Gillet, O.Gingras,
+- D.R.Hamann, G.Hautier, Xu He, N.Helbig, N.Holzwarth, Y.Jia, F.Jollet,
+- W.Lafargue-Dit-Hauret, K.Lejaeghere, M.A.L.Marques, A.Martin, C.Martins,
+- H.P.C. Miranda, F.Naccarato, K. Persson, G.Petretto, V.Planes, Y.Pouillon,
+- S.Prokhorenko, F.Ricci, G.-M.Rignanese, A.H.Romero, M.M.Schmitt, M.Torrent,
+- M.J.van Setten, B.Van Troeye, M.J.Verstraete, G.Zerah and J.W.Zwanzig
+- Comment: a global overview of ABINIT, with focus on selected capabilities .
+- Note that a version of this paper, that is not formatted for J. Chem. Phys. 
+- is available at
+-  https://github.com/abinit/abinit_assets/tree/main/abinit_package/papers/ABINIT20_JPC.pdf .
+- The licence allows the authors to put it on the Web.
+- DOI and bibtex: see https://docs.abinit.org/theory/bibliography/#romero2020
+-
+- [5] Recent developments in the ABINIT software package.
+- Computer Phys. Comm. 205, 106 (2016).
+- X.Gonze, F.Jollet, F.Abreu Araujo, D.Adams, B.Amadon, T.Applencourt,
+- C.Audouze, J.-M.Beuken, J.Bieder, A.Bokhanchuk, E.Bousquet, F.Bruneval
+- D.Caliste, M.Cote, F.Dahm, F.Da Pieve, M.Delaveau, M.Di Gennaro,
+- B.Dorado, C.Espejo, G.Geneste, L.Genovese, A.Gerossier, M.Giantomassi,
+- Y.Gillet, D.R.Hamann, L.He, G.Jomard, J.Laflamme Janssen, S.Le Roux,
+- A.Levitt, A.Lherbier, F.Liu, I.Lukacevic, A.Martin, C.Martins,
+- M.J.T.Oliveira, S.Ponce, Y.Pouillon, T.Rangel, G.-M.Rignanese,
+- A.H.Romero, B.Rousseau, O.Rubel, A.A.Shukri, M.Stankovski, M.Torrent,
+- M.J.Van Setten, B.Van Troeye, M.J.Verstraete, D.Waroquier, J.Wiktor,
+- B.Xu, A.Zhou, J.W.Zwanziger.
+- Comment: the fourth generic paper describing the ABINIT project.
+- Note that a version of this paper, that is not formatted for Computer Phys. Comm. 
+- is available at
+- https://github.com/abinit/abinit_assets/tree/main/abinit_package/papers/ABINIT16.pdf .
+- The licence allows the authors to put it on the Web.
+- DOI and bibtex: see https://docs.abinit.org/theory/bibliography/#gonze2016
+-
+- Proc.   0 individual time (sec): cpu=         19.9  wall=         13.1
+
+================================================================================
+
+ Calculation completed.
+.Delivered  11 WARNINGs and  20 COMMENTs to log file.
++Overall time at end (sec) : cpu=         19.9  wall=         13.1

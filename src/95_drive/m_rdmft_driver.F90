@@ -109,6 +109,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  integer,parameter :: master=0
  integer :: ib,ierr,ierr_t,ifunc,ik,ik_w,ib_w,iop,ip,iq,jk,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
  logical :: conv,is_jk,is_pnof,need_table,ok_fd,table_ok,use_sym,sym_ok
+ integer :: nspec,ndeg
  integer :: nok_sym,ntot_sym
  real(dp) :: dev_sym
  real(dp) :: alpha,e_corepsp,e_ewald,eexch,ehartree,ekin_tot,eone,eopt,ecut_eff,ecutdg_eff,etot,gsqcutc_eff,gsqcutf_eff
@@ -267,9 +268,28 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      '); ',symtab%ncls,' classes of the ',orbs%nkpt**2,' pairs of k-points, independent pairs to compute: ',&
      count(symtab%use),' (',100.0_dp*real(count(symtab%use),dp)/real(orbs%nkpt**2,dp),' % of the pairs)'
    call wrtout([ab_out,std_out],msg)
-   write(msg,'(a,i0,a,i0,a)') ' RDMFT: independent k-points of the orbital optimization: ',&
-     count(orbs%star_rep == [(ik,ik=1,orbs%nkpt)]),' of ',orbs%nkpt,ch10
+   write(msg,'(a,i0,a,i0)') ' RDMFT: independent k-points of the orbital optimization: ',&
+     count(orbs%star_rep == [(ik,ik=1,orbs%nkpt)]),' of ',orbs%nkpt
    call wrtout([ab_out,std_out],msg)
+   ! List of the k-points that are not reduced (their little group mixes the bands), with the number of pairs of
+   ! degenerate bands (energy difference below 1e-6 Ha) as a cross-check of the classification
+   nspec = 0
+   do ik=1,orbs%nkpt
+     if (symtab%generic(ik)) cycle
+     nspec = nspec+1
+     if (nspec > 40) cycle
+     ndeg = 0
+     do ib=2,orbs%nband(ik,1)
+       if (abs(orbs%eig(ib,ik,1)-orbs%eig(ib-1,ik,1)) < 1.0e-6_dp) ndeg = ndeg+1
+     end do
+     write(msg,'(a,i5,a,3f9.5,a,i0)') '   not reduced: k-point ',ik,' (',orbs%kpt(:,ik),') degenerate band pairs: ',ndeg
+     call wrtout([ab_out,std_out],msg)
+   end do
+   if (nspec > 40) then
+     write(msg,'(a,i0,a)') '   ... and ',nspec-40,' more'
+     call wrtout([ab_out,std_out],msg)
+   end if
+   call wrtout([ab_out,std_out],ch10)
  else
    call orbs%set_stars(.false.)
  end if
