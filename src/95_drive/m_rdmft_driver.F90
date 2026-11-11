@@ -155,9 +155,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
 
  !Fixed orbitals (non self-consistent): only the SD energy is independent of the arbitrary basis inside degenerate shells
  if (dtset%rdmft_orb_macro == 0 .and. dtset%rdmft_functional /= RDMFT_SD) then
-   ABI_WARNING(' RDMFT: rdmft_orb_macro = 0 (fixed orbitals) with a functional other than SD. The energy of these functionals depends on the&
-&   arbitrary basis chosen by the eigensolver inside degenerate shells (about 5e-5 Ha between eigensolvers in the tests). &
-&   Use rdmft_orb_macro > 0 to optimize the orbitals if you need a reproducible result.')
+   ABI_WARNING(' RDMFT: rdmft_orb_macro = 0 (fixed orbitals) with a functional other than SD. The energy of these&
+&   functionals depends on the arbitrary basis chosen by the eigensolver inside degenerate shells (about 5e-5 Ha&
+&   between eigensolvers in the tests). Use rdmft_orb_macro > 0 to optimize the orbitals if you need a reproducible&
+&   result.')
  end if
 
  write(msg,'(3a)') ch10,' RDMFT driver (code version '//trim(codvsn)//')',ch10
@@ -622,8 +623,8 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
        write(msg,'(a,es10.2,a)') ' RDMFT: energy from the integrals filled by symmetry minus the explicit one = ',dev_sym,' Ha'
        call wrtout([ab_out,std_out],msg)
        if (dev_sym > 1.0e-8_dp) then
-         write(msg,'(2a)') ' RDMFT: WARNING: the symmetry classes are not accurate any more (the orbitals lost the symmetry of the',&
-           ' ground state), use rdmft_sym_reduce = 0.'
+         write(msg,'(2a)') ' RDMFT: WARNING: the symmetry classes are not accurate any more (the orbitals lost the symmetry',&
+           ' of the ground state), use rdmft_sym_reduce = 0.'
          call wrtout([ab_out,std_out],msg)
        end if
      end if
@@ -1593,10 +1594,12 @@ contains
    call wrtout([ab_out,std_out],msg)
    write(msg,'(a,6f10.2)') '   ints: dens, sumdens, J, Ksweep, Kwait, Ksum (min) =',tint_min
    call wrtout([ab_out,std_out],msg)
-   write(msg,'(a,5f10.2,f10.2,es11.3)') '   K sweep profile, rank 0: toreal(k), toreal(k2), product, FFT, K value, Fock ZGEMM, n_FFT = ',&
+   write(msg,'(a,5f10.2,f10.2,es11.3)') '   K sweep profile, rank 0: toreal(k), toreal(k2), product, FFT, K value, '//&
+     'Fock ZGEMM, n_FFT = ',&
      rdmft_tprof(1:6),rdmft_tprof(7)
    call wrtout([ab_out,std_out],msg)
-   write(msg,'(a,4f10.2,f10.0)') '   PNOF evaluation profile: occupations+Jacobian, energy, gradient, contraction, n_eval =',rdmft_tpnof
+   write(msg,'(a,4f10.2,f10.0)') '   PNOF evaluation profile: occupations+Jacobian, energy, gradient, contraction, n_eval =',&
+     rdmft_tpnof
    call wrtout([ab_out,std_out],msg)
    if (dtset%rdmft_occ_skip > zero) call spot_check(kpar)
    if (dtset%prtvol >= 10) call check_h()

@@ -1005,9 +1005,11 @@ subroutine rdmft_orbs_expand_ibz(orbs,nexp)
  nexp = nkbz
 
  write(msg,'(3a,i0,a,i0,a,i0,a)') ch10,' RDMFT: the ground-state WFK holds the irreducible BZ (',&
-   'kptopt ',orbs%hdr%kptopt,'): ',orbs%hdr%nkpt,' k-points expanded to ',nkbz,' k-points of the full BZ with the symmetry operations'
+   'kptopt ',orbs%hdr%kptopt,'): ',orbs%hdr%nkpt,' k-points expanded to ',nkbz,&
+   ' k-points of the full BZ with the symmetry operations'
  call wrtout([ab_out,std_out],msg)
- write(msg,'(a,i0,a,i0,a)') '        (',orbs%hdr%nsym,' symmetry operations, ',nstar,' k-points obtained by rotation, the rest by time reversal)'
+ write(msg,'(a,i0,a,i0,a)') '        (',orbs%hdr%nsym,' symmetry operations, ',nstar,&
+   ' k-points obtained by rotation, the rest by time reversal)'
  call wrtout([ab_out,std_out],msg)
 
  ABI_FREE(kbz)

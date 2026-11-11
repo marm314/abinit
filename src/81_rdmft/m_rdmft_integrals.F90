@@ -71,7 +71,8 @@ module m_rdmft_integrals
  !> 3 J products and sum, 4 K pair sweep, 5 wait at the end of the K sweep (load imbalance), 6 sum of the K results
  real(dp),save :: rdmft_tint(6) = 0.0_dp
  !> Profile of the K sweep: 1 orbitals to real space (k), 2 orbital to real space (k'), 3 product of the orbitals,
- !> 4 FFT of the pair density, 5 K value and storage, 6 Fock part (inverse FFT, accumulation, ZGEMM), 7 number of pair densities (FFTs)
+ !> 4 FFT of the pair density, 5 K value and storage, 6 Fock part (inverse FFT, accumulation, ZGEMM),
+ !> 7 number of pair densities (FFTs)
  real(dp),save :: rdmft_tprof(7) = 0.0_dp
 
  !> Request of the exchange part of the generalized Fock matrices, built in the loop of the K integrals
