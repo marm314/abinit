@@ -86,15 +86,20 @@ the representative k-points. [[rdmft_tr_reduce]] = 0 computes all the pairs expl
 
 If the ground-state WFK holds the irreducible BZ ([[kptopt]] = 1 or 4 with [[nsym]] > 1) the orbitals of the full BZ are built
 from it by rotating the plane-wave coefficients with the symmetry operations (the orbitals of $-\mathbf{k}$ are the exact
-conjugates). With [[rdmft_sym_reduce]] = 1 (default) the operations are also used in the calculation: only one pair of k-points
-of each class of pairs related by the operations is computed for the integrals $J_{pq}$ and $K_{pq}$, and for the JK-only
-functionals ([[rdmft_functional]] = 1 to 10) the orbitals are optimized only at one k-point of each star of the operations. A pair of
-k-points is reduced only if the orbitals at both are mapped onto the orbitals of the image k-points band by band with a common phase
-(true for the generic stars, not for the k-points with degenerate shells and a non-trivial little group, whose pairs are computed
-explicitly). The PNOF functionals do not benefit (their subspaces are not symmetric under the operations); the run says so and uses
-time reversal only. In the tests on N2 (4x4x4 mesh, 16 operations) the converged energies of SD and MBB agree with the calculation
-without symmetry reduction to $10^{-10}$ and $3\times10^{-9}$ Ha, with about half of the cost. A control at the end of the orbital optimization
-prints the energy from the integrals filled by symmetry minus the explicit one.
+conjugates). With [[rdmft_sym_reduce]] = 1 (default) the operations are also used in the calculation, for the *reducible* k-points
+(trivial little group, or a little group that only multiplies the bands by phases): the integrals $J_{pq}$ and $K_{pq}$ are
+computed for one pair of k-points of each class of pairs related by the operations, and the orbitals are optimized at one
+k-point of each star of the operations. The other k-points (for example $\Gamma$, or the lines with doublets) are independent and
+unrestricted: they keep their time-reversal pairs, their orbitals can mix and localize, and their pairs are computed explicitly,
+so no degenerate shell has to be treated. For the PNOF functionals the table of subspaces is built from the stars and is invariant under the
+operations; it can differ from the one built without symmetry reduction. The reduction is a calculation restricted to the symmetry
+of the ground state for the reducible k-points (the gradient of a star is the size of the star times the one of its representative, an
+approximation of the order of the share of independent k-points when their orbitals break the symmetry). In the tests on N2
+(4x4x4 mesh, 16 operations) the converged energies of SD, MBB and GNOF agree with the calculation without symmetry reduction
+to $10^{-10}$, $3\times10^{-9}$ and $2\times10^{-7}$ Ha, with about half of the cost on 12 processes. For Si with the
+4x4x4 mesh and four shifts (256 k-points, 10 stars) the symmetry analysis gives 16 independent k-points (two stars of the $\Lambda$ line
+are independent) instead of about 128 with time reversal only. A control at the end of the orbital optimization prints the energy from the integrals
+filled by symmetry minus the explicit one.
 
 ## Active space and cost
 

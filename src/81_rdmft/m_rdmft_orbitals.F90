@@ -168,6 +168,7 @@ module m_rdmft_orbitals
 
    procedure :: expand_ibz => rdmft_orbs_expand_ibz
    procedure :: set_stars => rdmft_orbs_set_stars
+   procedure :: sym_images => rdmft_orbs_sym_images
    procedure :: build_symtab => rdmft_orbs_build_symtab
    ! Expand the orbitals of the irreducible BZ to the full BZ (symmetry operations of the ground state).
 
@@ -243,6 +244,12 @@ module m_rdmft_orbitals
    logical,allocatable :: ok(:,:)
    ! ok(nkpt,2*nsym)
    ! The operation maps the orbital (n,k) onto (n,image) for all the bands n (up to a phase).
+
+   logical,allocatable :: generic(:)
+   ! generic(nkpt)
+   ! Reducible k-point: the unitary operations that leave it unchanged are the identity only, or act on its bands with
+   ! diagonal matrices (no degenerate shell forced by symmetry). The other k-points are kept as independent k-points
+   ! (explicit pairs and rotations).
 
  contains
 
@@ -1036,6 +1043,7 @@ subroutine rdmft_symtab_free(tab)
  ABI_SFREE(tab%selft)
  ABI_SFREE(tab%kimg)
  ABI_SFREE(tab%ok)
+ ABI_SFREE(tab%generic)
  tab%ncls = 0
  tab%nops = 0
 
@@ -1056,12 +1064,14 @@ end subroutine rdmft_symtab_free
 !!  use_ibz = use the stars of the symmetry operations if they exist
 !!
 !! SOURCE
-subroutine rdmft_orbs_set_stars(orbs,use_ibz)
+subroutine rdmft_orbs_set_stars(orbs,use_ibz,generic)
 
  !Arguments ------------------------------------
  !scalars
  class(rdmft_orbs_t),intent(inout) :: orbs
  logical,intent(in) :: use_ibz
+ !arrays
+ logical,optional,intent(in) :: generic(:)
 
  !Local variables-------------------------------
  !scalars
@@ -1073,11 +1083,6 @@ subroutine rdmft_orbs_set_stars(orbs,use_ibz)
  ABI_SFREE(orbs%star_conj)
  ABI_MALLOC(orbs%star_rep,(orbs%nkpt))
  ABI_MALLOC(orbs%star_conj,(orbs%nkpt))
- if (use_ibz .and. allocated(orbs%ibz_rep)) then
-   orbs%star_rep = orbs%ibz_rep
-   orbs%star_conj = orbs%ibz_conj
-   return
- end if
  do ik=1,orbs%nkpt
    orbs%star_rep(ik) = ik
    orbs%star_conj(ik) = .false.
@@ -1086,53 +1091,48 @@ subroutine rdmft_orbs_set_stars(orbs,use_ibz)
      orbs%star_rep(ik) = jk
      orbs%star_conj(ik) = .true.
    end if
+   if (use_ibz .and. allocated(orbs%ibz_rep)) then
+     ! stars of the operations for the generic k-points; the others stay time-reversal pairs
+     if (present(generic)) then
+       if (.not.generic(ik)) cycle
+     end if
+     orbs%star_rep(ik) = orbs%ibz_rep(ik)
+     orbs%star_conj(ik) = orbs%ibz_conj(ik)
+   end if
  end do
 
 end subroutine rdmft_orbs_set_stars
 !!***
 
-!!****f* m_rdmft_orbitals/rdmft_orbs_build_symtab
+!!****f* m_rdmft_orbitals/rdmft_orbs_sym_images
 !! NAME
-!!  rdmft_orbs_build_symtab
+!!  rdmft_orbs_sym_images
 !!
 !! FUNCTION
-!!  Build the classes of ordered pairs of k-points under the symmetry operations of the ground state (spatial operations and
-!!  their products with time reversal) for which the orbitals are covariant: the image under the operation of the orbital
-!!  (n,k) is the orbital (n,k') of the mesh up to a phase, for all the bands n. This holds for the images of a star, and at a
-!!  k-point with a non-trivial little group only if the bands are not mixed inside degenerate shells by the operations of the
-!!  little group (the pairs that contain such a k-point are then not reduced by those operations).
-!!
-!! INPUTS
-!!  tol = largest accepted deviation of the covariance: 1-|<psi'_n|S psi_n>| and the difference between the overlaps of the bands
-!!
-!! OUTPUT
-!!  tab = the classes
-!!  nok, ntot = number of covariant (k, operation) couples, and of couples where the operation maps k into the mesh
-!!  devmax = largest deviation among the accepted couples
+!!  Action of the symmetry operations of the ground state (unitary operations and their products with time reversal) on the
+!!  k-points of the mesh, kimg(k,op), and the reducible k-points (generic): those whose little group (unitary operations
+!!  that leave the k-point unchanged) is trivial, or acts on the bands with diagonal matrices (the bands are only multiplied
+!!  by phases, no degenerate shell forced by symmetry). The other k-points (Gamma, lines with degenerate shells, ...) stay
+!!  independent and free: the symmetry is not used for them.
 !!
 !! SOURCE
-subroutine rdmft_orbs_build_symtab(orbs,tab,tol,nok,ntot,devmax)
+subroutine rdmft_orbs_sym_images(orbs,tab)
 
  !Arguments ------------------------------------
  !scalars
  class(rdmft_orbs_t),intent(in) :: orbs
  type(rdmft_symtab_t),intent(out) :: tab
- real(dp),intent(in) :: tol
- integer,intent(out) :: nok,ntot
- real(dp),intent(out) :: devmax
 
  !Local variables-------------------------------
  !scalars
- integer :: a,b,c,ia,ib,id,id2,ik,imem,iop,isym,itim,jk,nb,nk,nops,npw1,npw2,nsym,r1,r2
- real(dp) :: dev,ov(2),ov0(2)
- character(len=500) :: msg
- type(crystal_t) :: cryst
+ integer :: ib,ik,iop,isym,itim,jk,nb,nk,nmix,nops,npw1,nsym
  logical :: usable
+ type(crystal_t) :: cryst
  !arrays
  integer :: g0(3),gmax(3),work_ngfft(18)
- integer,allocatable :: parent(:),cnt(:),croot(:)
  real(dp) :: kp(3),dk(3)
  real(dp),allocatable :: cg2(:,:,:),work(:,:,:,:)
+ complex(dpc),allocatable :: cmat(:,:),cmat2(:,:),mm(:,:)
 
 ! *************************************************************************
 
@@ -1142,21 +1142,12 @@ subroutine rdmft_orbs_build_symtab(orbs,tab,tol,nok,ntot,devmax)
  nops = 2*nsym
  ABI_MALLOC(tab%kimg,(nk,nops))
  ABI_MALLOC(tab%ok,(nk,nops))
+ ABI_MALLOC(tab%generic,(nk))
  tab%kimg = 0
  tab%ok = .false.
- nok = 0
- ntot = 0
- devmax = zero
-
- gmax = 2*maxval(abs(orbs%kg))+1
- call ngfft_seq(work_ngfft,gmax)
- ABI_MALLOC(work,(2,work_ngfft(4),work_ngfft(5),work_ngfft(6)))
- work = zero
-
  do itim=0,1
    do isym=1,nsym
      iop = isym+nsym*itim
-     !Image of every k-point of the mesh
      usable = .true.
      do ik=1,nk
        kp = matmul(transpose(real(cryst%symrel(:,:,isym),dp)),orbs%kpt(:,ik))
@@ -1175,12 +1166,125 @@ subroutine rdmft_orbs_build_symtab(orbs,tab,tol,nok,ntot,devmax)
      end do
      if (.not.usable) then
        tab%kimg(:,iop) = 0
-       cycle
+     else
+       tab%nops = tab%nops+1
      end if
-     tab%nops = tab%nops+1
+   end do
+ end do
+ !A k-point is reducible if its little group does not mix its bands: the identity is the only unitary operation that leaves
+ !it unchanged (generic k-point), or every such operation acts on the bands with a diagonal matrix <psi_a|S psi_b> (no
+ !degenerate shell forced by symmetry, the bands are only multiplied by phases)
+ gmax = 2*maxval(abs(orbs%kg))+1
+ call ngfft_seq(work_ngfft,gmax)
+ ABI_MALLOC(work,(2,work_ngfft(4),work_ngfft(5),work_ngfft(6)))
+ work = zero
+ nmix = 0
+ do ik=1,nk
+   tab%generic(ik) = .true.
+   do isym=2,nsym
+     iop = isym
+     if (tab%kimg(1,iop) == 0) cycle
+     if (tab%kimg(ik,iop) /= ik) cycle
+     nb = orbs%nband(ik,1)
+     npw1 = orbs%npw(ik)
+     kp = matmul(transpose(real(cryst%symrel(:,:,isym),dp)),orbs%kpt(:,ik))
+     g0 = nint(orbs%kpt(:,ik)-kp)
+     ABI_MALLOC(cg2,(2,npw1*orbs%nspinor,nb))
+     call cgtk_rotate(cryst,orbs%kpt(:,ik),isym,0,g0,orbs%nspinor,nb,npw1,orbs%kg(:,1:npw1,ik),npw1,&
+                      orbs%kg(:,1:npw1,ik),1,1,orbs%cg(:,1:npw1*orbs%nspinor,1:nb,ik,1),cg2,work_ngfft,work)
+     ABI_MALLOC(cmat,(npw1*orbs%nspinor,nb))
+     ABI_MALLOC(cmat2,(npw1*orbs%nspinor,nb))
+     ABI_MALLOC(mm,(nb,nb))
+     cmat = cmplx(orbs%cg(1,1:npw1*orbs%nspinor,1:nb,ik,1),orbs%cg(2,1:npw1*orbs%nspinor,1:nb,ik,1),kind=dpc)
+     cmat2 = cmplx(cg2(1,:,:),cg2(2,:,:),kind=dpc)
+     mm = matmul(transpose(conjg(cmat)),cmat2)
+     do ib=1,nb
+       mm(ib,ib) = czero
+     end do
+     if (maxval(abs(mm)) > 1.0e-4_dp) tab%generic(ik) = .false.
+     ABI_FREE(cg2)
+     ABI_FREE(cmat)
+     ABI_FREE(cmat2)
+     ABI_FREE(mm)
+     if (.not.tab%generic(ik)) exit
+   end do
+   if (.not.tab%generic(ik)) nmix = nmix+1
+ end do
+ ABI_FREE(work)
+ call cryst%free()
+
+end subroutine rdmft_orbs_sym_images
+!!***
+
+!!****f* m_rdmft_orbitals/rdmft_orbs_build_symtab
+!! NAME
+!!  rdmft_orbs_build_symtab
+!!
+!! FUNCTION
+!!  Build the classes of ordered pairs of k-points under the symmetry operations of the ground state (spatial operations and
+!!  their products with time reversal) that map the orbitals of generic k-points onto the orbitals of the image k-points
+!!  (same band index, common phase), within the stars used by the orbital optimization (star_rep, star_conj): the image
+!!  of a star keeps the covariance during the optimization. The pairs that contain another k-point are computed explicitly.
+!!  Needs sym_images and set_stars before.
+!!
+!! INPUTS
+!!  tol = largest accepted deviation of the covariance: 1-|<psi'_n|S psi_n>| and the difference between the overlaps of the bands
+!!
+!! OUTPUT
+!!  tab = the classes
+!!  nok, ntot = number of covariant (k, operation) couples, and of couples where the operation maps k into the mesh
+!!  devmax = largest deviation among the accepted couples
+!!
+!! SOURCE
+subroutine rdmft_orbs_build_symtab(orbs,tab,tol,nok,ntot,devmax)
+
+ !Arguments ------------------------------------
+ !scalars
+ class(rdmft_orbs_t),intent(in) :: orbs
+ type(rdmft_symtab_t),intent(inout) :: tab
+ real(dp),intent(in) :: tol
+ integer,intent(out) :: nok,ntot
+ real(dp),intent(out) :: devmax
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: a,b,c,ia,ib,id,id2,ik,imem,iop,isym,itim,jk,nb,nk,nops,npw1,npw2,nsym,r1,r2
+ real(dp) :: dev,ov(2),ov0(2)
+ type(crystal_t) :: cryst
+ !arrays
+ integer :: g0(3),gmax(3),work_ngfft(18)
+ integer,allocatable :: parent(:),cnt(:),croot(:)
+ real(dp) :: kp(3)
+ real(dp),allocatable :: cg2(:,:,:),work(:,:,:,:)
+
+! *************************************************************************
+
+ cryst = orbs%hdr%get_crystal()
+ nsym = cryst%nsym
+ nk = orbs%nkpt
+ nops = 2*nsym
+ tab%ok = .false.
+ nok = 0
+ ntot = 0
+ devmax = zero
+
+ gmax = 2*maxval(abs(orbs%kg))+1
+ call ngfft_seq(work_ngfft,gmax)
+ ABI_MALLOC(work,(2,work_ngfft(4),work_ngfft(5),work_ngfft(6)))
+ work = zero
+
+ do itim=0,1
+   do isym=1,nsym
+     iop = isym+nsym*itim
+     if (tab%kimg(1,iop) == 0) cycle
      do ik=1,nk
        jk = tab%kimg(ik,iop)
        ntot = ntot+1
+       if (.not.tab%generic(ik)) cycle
+       !Only inside a star of the orbital optimization, with the conjugation of the rotation kept (unitary operation) or
+       !changed (antiunitary one)
+       if (orbs%star_rep(ik) /= orbs%star_rep(jk)) cycle
+       if ((orbs%star_conj(ik) .neqv. orbs%star_conj(jk)) .neqv. (itim == 1)) cycle
        nb = orbs%nband(ik,1)
        if (orbs%nband(jk,1) /= nb .or. orbs%npw(jk) /= orbs%npw(ik)) cycle
        npw1 = orbs%npw(ik)
@@ -1200,14 +1304,6 @@ subroutine rdmft_orbs_build_symtab(orbs,tab,tol,nok,ntot,devmax)
          if (ib == 1) ov0 = ov
          dev = max(dev,max(one-sqrt(ov(1)**2+ov(2)**2),zero),sqrt((ov(1)-ov0(1))**2+(ov(2)-ov0(2))**2))
        end do
-       !Unitary operations keep and antiunitary ones change the conjugation of the rotation of the star
-       if (allocated(orbs%ibz_conj)) then
-         if (orbs%ibz_rep(ik) /= orbs%ibz_rep(jk)) then
-           dev = one
-         else if ((orbs%ibz_conj(ik) .neqv. orbs%ibz_conj(jk)) .neqv. (itim == 1)) then
-           dev = one
-         end if
-       end if
        ABI_FREE(cg2)
        if (dev < tol) then
          tab%ok(ik,iop) = .true.

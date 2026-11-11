@@ -147,6 +147,7 @@ module m_rdmft_functionals
 
    procedure :: free => rdmft_pnof_table_free
    procedure :: build => rdmft_pnof_table_build
+   procedure :: build_sym => rdmft_pnof_table_build_sym
 
  end type rdmft_pnof_table_t
 !!***
@@ -971,6 +972,344 @@ subroutine rdmft_pnof_table_build(table,nbk,eig,occupied,active,partner,ncoupl,i
  ABI_FREE(cv)
 
 end subroutine rdmft_pnof_table_build
+!!***
+
+!!****f* m_rdmft_functionals/rdmft_pnof_table_build_sym
+!! NAME
+!!  rdmft_pnof_table_build_sym
+!!
+!! FUNCTION
+!!  Table of pairs and subspaces for the hybrid symmetry reduction. The units of occupation are the stars of the orbital
+!!  optimization (star_rep): for the generic k-points (trivial little group) the orbit of the orbital (n,k) under the
+!!  symmetry operations of the ground state, for the other k-points the time-reversal pair {k,-k} (or k alone if it is its
+!!  own -k), as in rdmft_pnof_table_build. All the orbitals of a unit have the same occupation (one variable).
+!!  Every active occupied unit is a principal unit, from the highest energy to the lowest, coupled with the (ncoupl-1)
+!!  lowest unused virtual units for which an assignment exists:
+!!   - generic principal unit: the subspaces form a family invariant under the operations, S Sigma(p) = Sigma(S p). The
+!!     virtual unit V must be generic and have a member v whose stabilizer (operations, including antiunitary ones, that
+!!     leave its k-point unchanged) is contained in the one of the principal p; the subspace of p contains the orbit of v
+!!     under the stabilizer of p and the one of the image S p its image, so that the subspaces of the principal unit use
+!!     every orbital of V exactly once;
+!!   - principal unit {p} alone (time-reversal-invariant k-point): one subspace with all the orbitals of V;
+!!   - principal pair {p,partner(p)}: two mirror subspaces, with one orbital of each pair {v,partner(v)} of V and its
+!!     partner (V without time-reversal-invariant k-points).
+!!  The operations are given by their action on the k-points, kimg(k,op) (0 for all k if the operation does not map the
+!!  mesh onto itself). The degenerate shells at the non-generic k-points need no special treatment: their orbitals are
+!!  independent and free to mix.
+!!
+!! INPUTS
+!!  nbk, nkpt = numbers of orbitals and of k-points; offset(nkpt), nband(nkpt) = composite index of the orbitals
+!!  eig, occupied, active = as rdmft_pnof_table_build
+!!  ncoupl = number of units of each class (1 principal + ncoupl-1 virtual)
+!!  star_rep(nkpt) = representative of the star of each k-point
+!!  generic(nkpt) = generic k-points; trk(nkpt) = index of -k (0 if not in the mesh)
+!!  kimg(nkpt,nops) = image of each k-point by each operation (unitary and antiunitary)
+!!
+!! OUTPUT
+!!  ierr = 0 if ok, 1 no principal unit or not enough eligible virtual units, 3 the active window or the occupied set is
+!!         not the same inside a unit
+!!
+!! SOURCE
+subroutine rdmft_pnof_table_build_sym(table,nbk,nkpt,offset,nband,eig,occupied,active,ncoupl,star_rep,generic,trk,kimg,ierr)
+
+ !Arguments ------------------------------------
+ !scalars
+ class(rdmft_pnof_table_t),intent(inout) :: table
+ integer,intent(in) :: nbk,nkpt,ncoupl
+ integer,intent(out) :: ierr
+ !arrays
+ integer,intent(in) :: offset(nkpt),nband(nkpt),star_rep(nkpt),trk(nkpt),kimg(:,:)
+ logical,intent(in) :: generic(nkpt)
+ real(dp),intent(in) :: eig(nbk)
+ logical,intent(in) :: occupied(nbk),active(nbk)
+
+ !Local variables-------------------------------
+ !scalars
+ integer :: i,ig,iop,iv,ip,jk,jp,kp,m,maxnc,n,nc,ng,nops,nsub,nvar,nw,s_p,sub0,vv,w
+ logical :: found
+ !arrays
+ integer,allocatable :: orb_k(:),orb_n(:),members(:),w0(:),wk(:,:),cvar(:),cnv(:),vmult(:),gorb(:),gsub(:),ovar(:)
+ logical,allocatable :: used(:),skipv(:),usable(:),fixk(:,:),gprin(:),tm(:)
+
+! *************************************************************************
+
+ call table%free()
+ ierr = 0
+ m = ncoupl-1
+ maxnc = count(occupied .and. active)
+ if (m < 1 .or. maxnc < 1) then
+   ierr = 1
+   return
+ end if
+ nops = size(kimg,2)
+ ABI_MALLOC(usable,(nops))
+ ABI_MALLOC(fixk,(nops,nkpt))
+ do iop=1,nops
+   usable(iop) = (kimg(1,iop) /= 0)
+   do jk=1,nkpt
+     fixk(iop,jk) = (usable(iop) .and. kimg(jk,iop) == jk)
+   end do
+ end do
+ ABI_MALLOC(orb_k,(nbk))
+ ABI_MALLOC(orb_n,(nbk))
+ do jk=1,nkpt
+   do n=1,nband(jk)
+     orb_k(offset(jk)+n) = jk
+     orb_n(offset(jk)+n) = n
+   end do
+ end do
+ ABI_MALLOC(used,(nbk))
+ ABI_MALLOC(skipv,(nbk))
+ ABI_MALLOC(members,(nkpt))
+ ABI_MALLOC(w0,(nkpt))
+ ABI_MALLOC(wk,(nkpt,nkpt))
+ ABI_MALLOC(tm,(nkpt))
+ ABI_MALLOC(cvar,(maxnc))
+ ABI_MALLOC(cnv,(maxnc))
+ ABI_MALLOC(vmult,(maxnc*(m+1)))
+ ABI_MALLOC(gorb,(nbk))
+ ABI_MALLOC(gsub,(nbk))
+ ABI_MALLOC(gprin,(nbk))
+ ABI_MALLOC(ovar,(nbk))
+ used = .false.
+ ovar = 0
+ nc = 0
+ ng = 0
+ nsub = 0
+ nvar = 0
+
+ ! The occupied and active flags are the same inside a unit
+ do ip=1,nbk
+   do jk=1,nkpt
+     if (star_rep(jk) /= star_rep(orb_k(ip))) cycle
+     if (orb_n(ip) > nband(jk)) then
+       ierr = 3
+       exit
+     end if
+     jp = offset(jk)+orb_n(ip)
+     if ((occupied(jp) .neqv. occupied(ip)) .or. (active(jp) .neqv. active(ip))) ierr = 3
+   end do
+   if (ierr /= 0) exit
+ end do
+
+ ! Principal units (highest energy first), each with its virtual units
+ do while (ierr == 0)
+   jp = 0
+   do ip=1,nbk
+     if (occupied(ip) .and. active(ip) .and. .not.used(ip)) then
+       if (jp == 0) then
+         jp = ip
+       else if (eig(ip) > eig(jp)) then
+         jp = ip
+       end if
+     end if
+   end do
+   if (jp == 0) exit
+   kp = orb_k(jp)
+   n = orb_n(jp)
+   nc = nc+1
+   cvar(nc) = nvar+1
+   cnv(nc) = m
+   s_p = 1
+   members(1) = kp
+   do jk=1,nkpt
+     if (jk /= kp .and. star_rep(jk) == star_rep(kp)) then
+       s_p = s_p+1
+       members(s_p) = jk
+     end if
+   end do
+   ! Principal variable and subspaces: one subspace per member of the principal unit
+   nvar = nvar+1
+   vmult(nvar) = 1
+   sub0 = nsub
+   do i=1,s_p
+     used(offset(members(i))+n) = .true.
+     ovar(offset(members(i))+n) = nvar
+     nsub = nsub+1
+     ng = ng+1
+     gorb(ng) = offset(members(i))+n
+     gsub(ng) = nsub
+     gprin(ng) = .true.
+   end do
+   skipv = .false.
+   do iv=1,m
+     ! lowest-energy unused virtual unit with an assignment
+     found = .false.
+     do
+       ip = 0
+       do vv=1,nbk
+         if (occupied(vv) .or. used(vv) .or. skipv(vv)) cycle
+         if (ip == 0) then
+           ip = vv
+         else if (eig(vv) < eig(ip)) then
+           ip = vv
+         end if
+       end do
+       if (ip == 0) exit
+       call try_virtual(ip,found)
+       if (found) exit
+       do jk=1,nkpt
+         if (star_rep(jk) == star_rep(orb_k(ip)) .and. orb_n(ip) <= nband(jk)) skipv(offset(jk)+orb_n(ip)) = .true.
+       end do
+     end do
+     if (.not.found) then
+       ierr = 1
+       exit
+     end if
+     ! Accept: variable of the unit, orbitals of each subspace
+     nvar = nvar+1
+     vmult(nvar) = nw
+     do i=1,s_p
+       do w=1,nw
+         ig = offset(wk(w,i))+orb_n(ip)
+         used(ig) = .true.
+         ovar(ig) = nvar
+         ng = ng+1
+         gorb(ng) = ig
+         gsub(ng) = sub0+i
+         gprin(ng) = .false.
+       end do
+     end do
+   end do
+   if (ierr /= 0) exit
+ end do
+ if (ierr == 0 .and. nc == 0) ierr = 1
+
+ if (ierr == 0) then
+   table%nclass = nc
+   table%nvar = nvar
+   table%ngam = nc*m
+   table%ng = ng
+   table%nsub = nsub
+   ABI_MALLOC(table%gem_orb,(nbk))
+   ABI_MALLOC(table%gem_sub,(nbk))
+   ABI_MALLOC(table%gem_principal,(nbk))
+   ABI_MALLOC(table%orb_var,(nbk))
+   ABI_MALLOC(table%class_var,(nc))
+   ABI_MALLOC(table%class_nvirt,(nc))
+   ABI_MALLOC(table%var_mult,(nvar))
+   table%gem_orb(1:ng) = gorb(1:ng)
+   table%gem_sub(1:ng) = gsub(1:ng)
+   table%gem_principal(1:ng) = gprin(1:ng)
+   table%orb_var = ovar
+   table%class_var = cvar(1:nc)
+   table%class_nvirt = cnv(1:nc)
+   table%var_mult = vmult(1:nvar)
+ end if
+
+ ABI_FREE(usable)
+ ABI_FREE(fixk)
+ ABI_FREE(orb_k)
+ ABI_FREE(orb_n)
+ ABI_FREE(used)
+ ABI_FREE(skipv)
+ ABI_FREE(members)
+ ABI_FREE(w0)
+ ABI_FREE(wk)
+ ABI_FREE(tm)
+ ABI_FREE(cvar)
+ ABI_FREE(cnv)
+ ABI_FREE(vmult)
+ ABI_FREE(gorb)
+ ABI_FREE(gsub)
+ ABI_FREE(gprin)
+ ABI_FREE(ovar)
+
+contains
+
+ subroutine try_virtual(ipv,ok_v)
+   ! Assignment of the virtual unit of the orbital ipv to the subspaces of the principal unit (kp, members, s_p)
+   integer,intent(in) :: ipv
+   logical,intent(out) :: ok_v
+   integer :: iq,kv,kvm,nv,s_v,mk,ii,iw,kk
+   logical :: sub
+   ok_v = .false.
+   kv = orb_k(ipv)
+   nv = orb_n(ipv)
+   s_v = 0
+   do mk=1,nkpt
+     if (star_rep(mk) == star_rep(kv) .and. nv <= nband(mk)) s_v = s_v+1
+   end do
+   if (generic(kp)) then
+     ! invariant family of subspaces: the virtual unit must be generic too
+     if (.not.generic(kv)) return
+     kvm = 0
+     do mk=1,nkpt
+       if (star_rep(mk) /= star_rep(kv) .or. nv > nband(mk)) cycle
+       sub = .true.
+       do iq=1,nops
+         if (fixk(iq,mk) .and. .not.fixk(iq,kp)) sub = .false.
+       end do
+       if (sub) then
+         kvm = mk
+         exit
+       end if
+     end do
+     if (kvm == 0) return
+     ! orbit of the member under the stabilizer of the principal
+     tm = .false.
+     nw = 0
+     do iq=1,nops
+       if (.not.fixk(iq,kp)) cycle
+       kk = kimg(kvm,iq)
+       if (.not.tm(kk)) then
+         tm(kk) = .true.
+         nw = nw+1
+         w0(nw) = kk
+       end if
+     end do
+     if (s_p*nw /= s_v) return
+     ! images under an operation that maps kp onto each member of the principal unit
+     do ii=1,s_p
+       if (ii == 1) then
+         wk(1:nw,1) = w0(1:nw)
+       else
+         iq = 0
+         do iw=1,nops
+           if (usable(iw) .and. kimg(kp,iw) == members(ii)) then
+             iq = iw
+             exit
+           end if
+         end do
+         if (iq == 0) return
+         do iw=1,nw
+           wk(iw,ii) = kimg(w0(iw),iq)
+         end do
+       end if
+     end do
+   else
+     ! non-generic principal: time-reversal type table
+     nw = 0
+     do mk=1,nkpt
+       if (star_rep(mk) /= star_rep(kv) .or. nv > nband(mk)) cycle
+       if (s_p == 1) then
+         nw = nw+1
+         wk(nw,1) = mk
+       else
+         if (trk(mk) == mk .or. trk(mk) == 0) return
+         if (mk < trk(mk)) then
+           nw = nw+1
+           wk(nw,1) = mk
+           wk(nw,2) = trk(mk)
+         end if
+       end if
+     end do
+     if (s_p == 2 .and. 2*nw /= s_v) return
+     if (s_p > 2) return
+   end if
+   ! the orbitals must be distinct and unused
+   tm = .false.
+   do ii=1,s_p
+     do iw=1,nw
+       kk = wk(iw,ii)
+       if (tm(kk) .or. used(offset(kk)+nv)) return
+       tm(kk) = .true.
+     end do
+   end do
+   ok_v = .true.
+ end subroutine try_virtual
+
+end subroutine rdmft_pnof_table_build_sym
 !!***
 
 !!****f* m_rdmft_functionals/rdmft_pnof_table_remap

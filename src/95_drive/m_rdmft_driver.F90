@@ -253,25 +253,25 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  !Symmetry reduction (rdmft_sym_reduce = 1, ground-state WFK with the irreducible BZ): classes of pairs of k-points for the
  !integrals, and for the JK-only functionals the independent k-points of the orbital optimization are the stars of the
  !symmetry operations (the PNOF subspaces are not symmetric under the operations: time reversal stars only)
- use_sym = (dtset%rdmft_sym_reduce == 1 .and. allocated(orbs%ibz_rep) .and. (is_jk .or. dtset%rdmft_orb_macro == 0))
- if (dtset%rdmft_sym_reduce == 1 .and. allocated(orbs%ibz_rep) .and. .not.use_sym) then
-   write(msg,'(2a)') ' RDMFT: rdmft_sym_reduce = 1 but the symmetry operations are not used in the calculation: the orbitals of ',&
-     'a PNOF functional are optimized (the PNOF subspaces are not symmetric under the operations).'
-   call wrtout([ab_out,std_out],msg)
- end if
- call orbs%set_stars(use_sym .and. is_jk)
+ use_sym = (dtset%rdmft_sym_reduce >= 1 .and. allocated(orbs%ibz_rep))
  if (use_sym) then
+   ! hybrid reduction: the generic k-points (trivial little group) are reduced, the others stay independent
+   call orbs%sym_images(symtab)
+   call orbs%set_stars(.true.,symtab%generic)
    call orbs%build_symtab(symtab,1.0e-11_dp,nok_sym,ntot_sym,dev_sym)
-   write(msg,'(2a,2(i0,a),es9.2,a,3(i0,a),f6.1,a)') ch10,' RDMFT: symmetry reduction: ',nok_sym,' of ',ntot_sym,&
+   write(msg,'(2a,i0,a,i0,a)') ch10,' RDMFT: symmetry reduction: reducible k-points (no band mixing by the little group) ',&
+     count(symtab%generic),' of ',orbs%nkpt,'; the others are independent k-points'
+   call wrtout([ab_out,std_out],msg)
+   write(msg,'(2(i0,a),es9.2,a,3(i0,a),f6.1,a)') nok_sym,' of ',ntot_sym,&
      ' (k-point, operation) couples map the orbitals onto the orbitals of the image k-point (largest deviation ',dev_sym,&
      '); ',symtab%ncls,' classes of the ',orbs%nkpt**2,' pairs of k-points, independent pairs to compute: ',&
      count(symtab%use),' (',100.0_dp*real(count(symtab%use),dp)/real(orbs%nkpt**2,dp),' % of the pairs)'
    call wrtout([ab_out,std_out],msg)
-   if (is_jk) then
-     write(msg,'(a,i0,a,i0,a)') ' RDMFT: independent k-points of the orbital optimization (stars of the operations): ',&
-       count(orbs%star_rep == [(ik,ik=1,orbs%nkpt)]),' of ',orbs%nkpt,ch10
-     call wrtout([ab_out,std_out],msg)
-   end if
+   write(msg,'(a,i0,a,i0,a)') ' RDMFT: independent k-points of the orbital optimization: ',&
+     count(orbs%star_rep == [(ik,ik=1,orbs%nkpt)]),' of ',orbs%nkpt,ch10
+   call wrtout([ab_out,std_out],msg)
+ else
+   call orbs%set_stars(.false.)
  end if
  tst(2) = abi_wtime()-t_start
 
@@ -348,7 +348,28 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  ! PNOF subspaces (rdmft_ncoupl), needed to optimize a PNOF and to evaluate them with the ground-state occupations
  if (.not.restart_full) then
    ierr_t = 1
-   if (need_table) call table%build(nbk,eigc,occd,actc,partner,dtset%rdmft_ncoupl,ierr_t)
+   if (need_table .and. use_sym) then
+     ! Table invariant under the symmetry operations (occupation units = orbits of the orbitals)
+     call table%build_sym(nbk,orbs%nkpt,offset,orbs%nband(:,1),eigc,occd,actc,dtset%rdmft_ncoupl,orbs%star_rep,&
+                          symtab%generic,orbs%tr_k,symtab%kimg,ierr_t)
+     if (ierr_t /= 0) then
+       write(msg,'(a,i0,2a)') ' RDMFT: no table of subspaces invariant under the symmetry operations (code ',ierr_t,&
+         '): the symmetry reduction is not used, only time reversal.',ch10
+       call wrtout([ab_out,std_out],msg)
+       use_sym = .false.
+       call symtab%free()
+       call orbs%set_stars(.false.)
+     end if
+   end if
+   if (use_sym .and. dtset%rdmft_sym_reduce == 2) then
+     ! Debug: the table invariant under the operations, but without any reduction in the calculation
+     use_sym = .false.
+     call symtab%free()
+     call orbs%set_stars(.false.)
+   end if
+   if (need_table .and. .not.use_sym .and. .not.(ierr_t == 0 .and. dtset%rdmft_sym_reduce == 2)) then
+     call table%build(nbk,eigc,occd,actc,partner,dtset%rdmft_ncoupl,ierr_t)
+   end if
  end if
  table_ok = (need_table .and. ierr_t == 0)
  if (is_pnof .and. .not.table_ok) then
@@ -1134,12 +1155,12 @@ contains
      rsym = .false.
      do jk=1,orbs%nkpt
        do ib2=1,orbs%nband(jk,1)
-         if (relev(offset(jk)+ib2)) rsym(orbs%ibz_rep(jk),ib2) = .true.
+         if (relev(offset(jk)+ib2)) rsym(orbs%star_rep(jk),ib2) = .true.
        end do
      end do
      do jk=1,orbs%nkpt
        do ib2=1,orbs%nband(jk,1)
-         relev(offset(jk)+ib2) = rsym(orbs%ibz_rep(jk),ib2)
+         relev(offset(jk)+ib2) = rsym(orbs%star_rep(jk),ib2)
        end do
      end do
      ABI_FREE(rsym)

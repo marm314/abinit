@@ -20216,22 +20216,31 @@ zone are always built from it, by rotating the plane-wave coefficients with the 
 time-reversed orbitals by conjugation), and the k-point mesh is then the full one with uniform weights. A WFK file with a
 reduction by time reversal only ([[kptopt]] = 2) or without reduction ([[kptopt]] = 3, or [[nsym]] = 1) is used as it is.
 
-With **rdmft_sym_reduce** = 1 (default) the symmetry operations are also used in the calculation: the Coulomb and exchange
-integrals $J_{pq}$ and $K_{pq}$ between the orbitals $(n,\mathbf{k})$ and $(m,\mathbf{k}')$ are computed only for one pair of
-k-points of each class of pairs related by the operations (the integrals of the equivalent pairs are equal), and for the JK-only
-functionals ([[rdmft_functional]] = 1 to 10) the orbitals are optimized only at one k-point of each star, the rotation of the
-bands being applied to the other k-points of the star (conjugated for the time-reversed ones). For the PNOF functionals only the
-time-reversal pairs are used for the orbital optimization, because the subspaces are not symmetric under the operations.
-A pair of k-points is reduced by an operation only if the orbitals at both k-points are mapped onto the orbitals of the image
-k-points, band by band: this is true for the images of a star, and at a k-point with a non-trivial little group only if the
-operations do not mix the bands of a degenerate shell. The pairs that contain such a k-point (for example $\Gamma$ with
-degenerate states) are computed explicitly by the same code, and the summary printed at the beginning gives the fraction of pairs that are
-computed. The active window ([[rdmft_ecut_act]], [[rdmft_nocc_act]], [[rdmft_nvir_act]]) must be the same at the k-points related by
-the operations (it must not cut a degenerate shell), otherwise the run stops and **rdmft_sym_reduce** = 0 must be used.
-With **rdmft_sym_reduce** = 0 the symmetry operations are not used in the calculation (only to expand the WFK file): the
-results are the same to numerical precision (the ground-state orbitals of the symmetric and of the unreduced calculation differ at
-the level of the convergence tolerance), and this option is useful to debug. A WFK file written by a previous RDMFT run
-([[rdmft_restart]]) holds the full BZ and is used without symmetry reduction.
+With **rdmft_sym_reduce** = 1 (default) the symmetry operations are also used in the calculation, for the *reducible* k-points
+only: those whose little group (the operations that leave $\mathbf{k}$ unchanged) is trivial or acts on the bands with diagonal
+matrices, so that the symmetry does not force degenerate shells. The other k-points (for example $\Gamma$ or the lines where the
+little group has two-dimensional irreducible representations) stay independent, as without symmetry reduction: their orbitals are
+free to mix and to localize, and their pairs are computed explicitly (the summary printed at the beginning gives the numbers).
+For the reducible k-points:
+the Coulomb and exchange integrals $J_{pq}$ and $K_{pq}$ between the orbitals $(n,\mathbf{k})$ and $(m,\mathbf{k}')$ are computed
+only for one pair of each class of pairs related by the operations (the integrals of the equivalent pairs are equal);
+the orbitals are optimized only at one k-point of each star of the operations, the rotation of the bands being applied to the
+other k-points of the star (conjugated for the time-reversed ones), and the occupation numbers are the same for the
+orbitals of a star. This is a calculation restricted to the symmetry of the ground state for these k-points: a solution that breaks
+the symmetry of the set of orbitals is not found. The final energy is compared with the one computed without the symmetry classes.
+
+For the PNOF functionals the table of subspaces is built from the stars: the units of occupation are the orbits of the orbitals under
+the operations for the reducible k-points and the time-reversal pairs for the others, and the family of subspaces is invariant
+under the operations (the subspace of the image of a principal orbital is the image of its subspace). The virtual units are chosen
+by increasing energy among those with an invariant assignment, so the table can differ from the one built without symmetry
+reduction, and so can the energy. If no such table exists the code uses the time-reversal table and the run says so.
+
+With **rdmft_sym_reduce** = 0 the symmetry operations are used only to expand the WFK file: the calculation is done as with a WFK
+of the full mesh (time reversal only), and this option is useful to debug. With **rdmft_sym_reduce** = 2 the table of subspaces
+of the PNOF functionals is the symmetric one but the operations are not used to reduce the calculation (debug: the results must be
+those of 1 up to the effect of the restriction of the orbitals). The active window ([[rdmft_ecut_act]], [[rdmft_nocc_act]],
+[[rdmft_nvir_act]]) must be the same at the k-points related by the operations, otherwise the symmetry reduction is not used.
+A WFK file written by a previous RDMFT run ([[rdmft_restart]]) holds the full BZ and is used without symmetry reduction.
 """,
 ),
 
