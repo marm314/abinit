@@ -20200,6 +20200,42 @@ same full matrices. With **rdmft_tr_reduce** = 0 all the pairs of k-points of th
 ),
 
 Variable(
+    abivarname="rdmft_sym_reduce",
+    varset="dev",
+    vartype="integer",
+    topics=["RDMFT_useful"],
+    dimensions="scalar",
+    defaultval=1,
+    mnemonics="Reduced Density Matrix Functional Theory: use the SYMMETRY operations to REDUCE the k-points",
+    characteristics=["[[DEVELOP]]"],
+    added_in_version="10.9.3",
+    text=r"""
+In an RDMFT calculation ([[optdriver]] = 11) the ground-state WFK file may hold only the irreducible Brillouin zone (a
+calculation with [[kptopt]] = 1 or 4 and more than one symmetry operation, [[nsym]] > 1). The orbitals of the full Brillouin
+zone are always built from it, by rotating the plane-wave coefficients with the symmetry operations of the ground state (and the
+time-reversed orbitals by conjugation), and the k-point mesh is then the full one with uniform weights. A WFK file with a
+reduction by time reversal only ([[kptopt]] = 2) or without reduction ([[kptopt]] = 3, or [[nsym]] = 1) is used as it is.
+
+With **rdmft_sym_reduce** = 1 (default) the symmetry operations are also used in the calculation: the Coulomb and exchange
+integrals $J_{pq}$ and $K_{pq}$ between the orbitals $(n,\mathbf{k})$ and $(m,\mathbf{k}')$ are computed only for one pair of
+k-points of each class of pairs related by the operations (the integrals of the equivalent pairs are equal), and for the JK-only
+functionals ([[rdmft_functional]] = 1 to 10) the orbitals are optimized only at one k-point of each star, the rotation of the
+bands being applied to the other k-points of the star (conjugated for the time-reversed ones). For the PNOF functionals only the
+time-reversal pairs are used for the orbital optimization, because the subspaces are not symmetric under the operations.
+A pair of k-points is reduced by an operation only if the orbitals at both k-points are mapped onto the orbitals of the image
+k-points, band by band: this is true for the images of a star, and at a k-point with a non-trivial little group only if the
+operations do not mix the bands of a degenerate shell. The pairs that contain such a k-point (for example $\Gamma$ with
+degenerate states) are computed explicitly by the same code, and the summary printed at the beginning gives the fraction of pairs that are
+computed. The active window ([[rdmft_ecut_act]], [[rdmft_nocc_act]], [[rdmft_nvir_act]]) must be the same at the k-points related by
+the operations (it must not cut a degenerate shell), otherwise the run stops and **rdmft_sym_reduce** = 0 must be used.
+With **rdmft_sym_reduce** = 0 the symmetry operations are not used in the calculation (only to expand the WFK file): the
+results are the same to numerical precision (the ground-state orbitals of the symmetric and of the unreduced calculation differ at
+the level of the convergence tolerance), and this option is useful to debug. A WFK file written by a previous RDMFT run
+([[rdmft_restart]]) holds the full BZ and is used without symmetry reduction.
+""",
+),
+
+Variable(
     abivarname="rdmft_core_ints",
     varset="dev",
     vartype="integer",

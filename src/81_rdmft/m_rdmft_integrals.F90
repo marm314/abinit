@@ -37,7 +37,7 @@ module m_rdmft_integrals
  use m_barevcoul,        only : barevcoul
  use m_fft,              only : fourdp
  use m_mpinfo,           only : destroy_mpi_enreg, initmpi_seq
- use m_rdmft_orbitals,   only : rdmft_orbs_t
+ use m_rdmft_orbitals,   only : rdmft_orbs_t, rdmft_symtab_t
  use m_io_tools,         only : get_unit
  use m_specialmsg,       only : wrtout
  use m_time,              only : abi_wtime
@@ -352,13 +352,17 @@ end subroutine rdmft_mem_report
 !!  reduce = (optional) if true, use time reversal: only the independent blocks of k-points (a representative of each pair
 !!    k, -k) are computed, the rest of the matrices J_pq, K_pq is filled by symmetry (J_pq = J_p,-q = J_-p,-q and
 !!    K_-p,-q = K_pq). The free and background orbitals must be the same at k and -k.
+!!  sym = (optional) classes of pairs of k-points under the symmetry operations of the ground state (rdmft_symtab_t): only
+!!    the representative pair of each class is computed and the integrals of the pairs of the class are filled with the same
+!!    value (replaces the time-reversal reduction). The free and background orbitals must be the same at the k-points
+!!    related by the operations.
 !!
 !! OUTPUT
 !!  ints
 !!
 !! SOURCE
 subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_k,rcut_k,free,bg,core_ints,quiet,comm,req,&
-                               rel,reduce)
+                               rel,reduce,sym)
 
  !Arguments ------------------------------------
  !scalars
@@ -372,6 +376,7 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  type(rdmft_fockreq_t),optional,intent(inout) :: req
  logical,optional,intent(in) :: rel(:)
  logical,optional,intent(in) :: reduce
+ type(rdmft_symtab_t),optional,intent(in) :: sym
  !arrays
  integer,intent(in) :: ngfft(18)
  logical,intent(in) :: free(:),bg(:)
@@ -384,7 +389,8 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  integer,allocatable :: fk(:),fb(:)
  integer :: jlo,jhi,cnt,comm_,ib,ierr,ik,iq,ip,jb,jk,jp,me,nb,nbj,nfft,nproc
  logical :: canon,fused,needk,red,wantf,isff,anybg
- integer :: ipb,iqb,pk
+ integer :: ipb,iqb,pk,cc,imem,ma,mb,ipm,iqm
+ logical :: usesym,cselft
  integer,allocatable :: trk(:)
  real(dp) :: wgt
  real(dp),allocatable :: wacc(:,:,:),yk(:,:),wrs(:,:)
@@ -444,6 +450,10 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
  ! Use of time reversal: the orbital (n,-k) is the complex conjugate of (n,k)
  red = .false.
  if (present(reduce)) red = reduce
+ usesym = present(sym)
+ if (usesym) usesym = (sym%ncls > 0)
+ if (usesym) red = .false.
+ cselft = .false.
  ABI_MALLOC(trk,(orbs%nkpt))
  trk = orbs%tr_k
  if (red .and. any(trk == 0)) red = .false.
@@ -635,7 +645,15 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
      end if
      ! Pairs with a background orbital: k' >= k
      anybg = any(bg(ints%offset(ik)+1:ints%offset(ik)+nb)) .or. any(bg(ints%offset(jk)+1:ints%offset(jk)+nbj))
-     if (.not.(canon .or. wantf .or. (anybg .and. jk >= ik))) cycle
+     if (usesym) then
+       ! Symmetry classes: the representative pair of a class that is computed (not the transposed of a smaller class)
+       cc = sym%cls(ik,jk)
+       canon = (sym%rep(1,cc) == ik .and. sym%rep(2,cc) == jk .and. sym%use(cc))
+       cselft = sym%selft(cc)
+       if (.not.(canon .or. wantf)) cycle
+     else
+       if (.not.(canon .or. wantf .or. (anybg .and. jk >= ik))) cycle
+     end if
      !Coulomb kernel for q = k' - k
      qpt(:) = orbs%kpt(:,jk)-orbs%kpt(:,ik)
      call barevcoul(rcut_k,icutcoul_k,qpt,gsqcut,gmet,nfft,orbs%nkpt,ngfft,orbs%ucvol,izero0,vc)
@@ -656,7 +674,12 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          ip = ints%offset(ik)+ib
          fp = free(ip); bp = bg(ip)
          isff = (fp .and. fq)
-         if (isff) then
+         if (usesym) then
+           ! The band pairs (n,m) and (m,n) of a representative pair that is its own transposed are equivalent
+           needk = canon .and. (isff .or. fp .or. bp)
+           if (cselft .and. jb < ib) needk = .false.
+           if (.not.isff .and. bp .and. bq .and. .not.core_ints) needk = .false.
+         else if (isff) then
            needk = canon
            if (jb > ib .and. (jk == ik .or. (red .and. jk == trk(ik)))) needk = .false.
          else
@@ -697,7 +720,31 @@ subroutine rdmft_ints_compute(ints,orbs,ngfft,gsqcut,icutcoul_j,rcut_j,icutcoul_
          if (.not.needk) cycle
          tpk = abi_wtime()
          kval = sum(vc(:)*(pgrid(1,:)**2+pgrid(2,:)**2))/orbs%ucvol
-         if (isff) then
+         if (usesym) then
+           ! The same value for all the pairs of k-points of the class (and the transposed pairs)
+           do imem=sym%mptr(cc),sym%mptr(cc+1)-1
+             ma = sym%mem(1,imem)
+             mb = sym%mem(2,imem)
+             ipm = ints%offset(ma)+ib
+             iqm = ints%offset(mb)+jb
+             if (isff) then
+               ints%kint(ints%free_of(ipm),ints%free_of(iqm)) = kval
+               ints%kint(ints%free_of(iqm),ints%free_of(ipm)) = kval
+               cycle
+             end if
+             ! sums over pairs: the pair (ma,ib),(mb,ib) with ma > mb is the same as the one with the members exchanged
+             if (cselft .and. ib == jb .and. ma > mb) cycle
+             if (fp .and. bq) then
+               ints%bk(ints%free_of(ipm)) = ints%bk(ints%free_of(ipm))+kval
+             else if (bp .and. fq) then
+               ints%bk(ints%free_of(iqm)) = ints%bk(ints%free_of(iqm))+kval
+             else if (ipm == iqm) then
+               ints%skd = ints%skd+kval
+             else
+               ints%sko = ints%sko+two*kval
+             end if
+           end do
+         else if (isff) then
            ints%kint(ints%free_of(ip),ints%free_of(iq)) = kval
            ints%kint(ints%free_of(iq),ints%free_of(ip)) = kval
            if (red) then

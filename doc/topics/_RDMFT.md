@@ -82,6 +82,20 @@ computed only for the independent blocks of k-points and the rest of the matrice
 $J_{pq}=J_{p\bar q}=J_{\bar p\bar q}$ and $K_{\bar p\bar q}=K_{pq}$; the generalized Fock matrices already use
 the representative k-points. [[rdmft_tr_reduce]] = 0 computes all the pairs explicitly, for debugging; the results must be the same.
 
+### Irreducible Brillouin zone
+
+If the ground-state WFK holds the irreducible BZ ([[kptopt]] = 1 or 4 with [[nsym]] > 1) the orbitals of the full BZ are built
+from it by rotating the plane-wave coefficients with the symmetry operations (the orbitals of $-\mathbf{k}$ are the exact
+conjugates). With [[rdmft_sym_reduce]] = 1 (default) the operations are also used in the calculation: only one pair of k-points
+of each class of pairs related by the operations is computed for the integrals $J_{pq}$ and $K_{pq}$, and for the JK-only
+functionals ([[rdmft_functional]] = 1 to 10) the orbitals are optimized only at one k-point of each star of the operations. A pair of
+k-points is reduced only if the orbitals at both are mapped onto the orbitals of the image k-points band by band with a common phase
+(true for the generic stars, not for the k-points with degenerate shells and a non-trivial little group, whose pairs are computed
+explicitly). The PNOF functionals do not benefit (their subspaces are not symmetric under the operations); the run says so and uses
+time reversal only. In the tests on N2 (4x4x4 mesh, 16 operations) the converged energies of SD and MBB agree with the calculation
+without symmetry reduction to $10^{-10}$ and $3\times10^{-9}$ Ha, with about half of the cost. A control at the end of the orbital optimization
+prints the energy from the integrals filled by symmetry minus the explicit one.
+
 ## Active space and cost
 
 The occupations that are optimized are those of the active orbitals: the occupied orbitals with an energy larger

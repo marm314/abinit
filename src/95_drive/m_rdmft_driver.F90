@@ -50,7 +50,7 @@ module m_rdmft_driver
  use m_mpinfo,            only : destroy_mpi_enreg, initmpi_seq
  use m_rdmft_integrals,   only : orb_to_real_one, rdmft_fockreq_t, rdmft_ints_t, rdmft_mem_on, rdmft_tint, rdmft_tprof
  use m_rdmft_optimizer,   only : rdmft_grad_jk, rdmft_optimize_jk, rdmft_optimize_pnof, rdmft_tpnof
- use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix
+ use m_rdmft_orbitals,    only : rdmft_orbs_t, rdmft_rot_matrix, rdmft_symtab_t
  use m_specialmsg,        only : wrtout
  use m_time,              only : abi_wtime
 
@@ -107,8 +107,10 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  !Local variables-------------------------------
  !scalars
  integer,parameter :: master=0
- integer :: ib,ierr,ierr_t,ifunc,ik,ik_w,ib_w,ip,iq,jk,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
- logical :: conv,is_jk,is_pnof,need_table,ok_fd,table_ok
+ integer :: ib,ierr,ierr_t,ifunc,ik,ik_w,ib_w,iop,ip,iq,jk,jp,mgfftf,nadded,nbk,nf,nfftf,niter,nocc_k
+ logical :: conv,is_jk,is_pnof,need_table,ok_fd,table_ok,use_sym,sym_ok
+ integer :: nok_sym,ntot_sym
+ real(dp) :: dev_sym
  real(dp) :: alpha,e_corepsp,e_ewald,eexch,ehartree,ekin_tot,eone,eopt,ecut_eff,ecutdg_eff,etot,gsqcutc_eff,gsqcutf_eff
  real(dp) :: devtr,maxdev,ntarget,nk2,sexch,shart
  character(len=500) :: msg
@@ -120,6 +122,7 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
  type(rdmft_ints_t) :: ints
  type(rdmft_orbs_t) :: orbs
  type(rdmft_pnof_table_t) :: table
+ type(rdmft_symtab_t) :: symtab
  !arrays
  integer :: ngfftc(18),ngfftf(18)
  integer,allocatable :: bandc(:),noccb(:),offset(:),partner(:),partf(:)
@@ -246,6 +249,30 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    call wrtout([ab_out,std_out],msg)
  end if
  nk2 = real(orbs%nkpt,dp)**2
+
+ !Symmetry reduction (rdmft_sym_reduce = 1, ground-state WFK with the irreducible BZ): classes of pairs of k-points for the
+ !integrals, and for the JK-only functionals the independent k-points of the orbital optimization are the stars of the
+ !symmetry operations (the PNOF subspaces are not symmetric under the operations: time reversal stars only)
+ use_sym = (dtset%rdmft_sym_reduce == 1 .and. allocated(orbs%ibz_rep) .and. (is_jk .or. dtset%rdmft_orb_macro == 0))
+ if (dtset%rdmft_sym_reduce == 1 .and. allocated(orbs%ibz_rep) .and. .not.use_sym) then
+   write(msg,'(2a)') ' RDMFT: rdmft_sym_reduce = 1 but the symmetry operations are not used in the calculation: the orbitals of ',&
+     'a PNOF functional are optimized (the PNOF subspaces are not symmetric under the operations).'
+   call wrtout([ab_out,std_out],msg)
+ end if
+ call orbs%set_stars(use_sym .and. is_jk)
+ if (use_sym) then
+   call orbs%build_symtab(symtab,1.0e-11_dp,nok_sym,ntot_sym,dev_sym)
+   write(msg,'(2a,2(i0,a),es9.2,a,3(i0,a),f6.1,a)') ch10,' RDMFT: symmetry reduction: ',nok_sym,' of ',ntot_sym,&
+     ' (k-point, operation) couples map the orbitals onto the orbitals of the image k-point (largest deviation ',dev_sym,&
+     '); ',symtab%ncls,' classes of the ',orbs%nkpt**2,' pairs of k-points, independent pairs to compute: ',&
+     count(symtab%use),' (',100.0_dp*real(count(symtab%use),dp)/real(orbs%nkpt**2,dp),' % of the pairs)'
+   call wrtout([ab_out,std_out],msg)
+   if (is_jk) then
+     write(msg,'(a,i0,a,i0,a)') ' RDMFT: independent k-points of the orbital optimization (stars of the operations): ',&
+       count(orbs%star_rep == [(ik,ik=1,orbs%nkpt)]),' of ',orbs%nkpt,ch10
+     call wrtout([ab_out,std_out],msg)
+   end if
+ end if
  tst(2) = abi_wtime()-t_start
 
  !FFT mesh and G^2 cut-off containing the products of two orbitals (same as for the density)
@@ -367,12 +394,37 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
    end do
  end if
 
+ !With the symmetry classes the active space (free and background orbitals) must be the same at the k-points related by the
+ !operations (same band index), otherwise (for example the virtual orbitals of the PNOF subspaces, chosen by energy and index)
+ !the classes are not used
+ if (use_sym) then
+   sym_ok = .true.
+   do iop=1,2*orbs%hdr%nsym
+     if (symtab%kimg(1,iop) == 0) cycle
+     do ik=1,orbs%nkpt
+       if (.not.symtab%ok(ik,iop)) cycle
+       jk = symtab%kimg(ik,iop)
+       do ib=1,orbs%nband(ik,1)
+         if ((free(offset(ik)+ib) .neqv. free(offset(jk)+ib)) .or. (bg(offset(ik)+ib) .neqv. bg(offset(jk)+ib))) sym_ok = .false.
+       end do
+     end do
+   end do
+   if (.not.sym_ok) then
+     use_sym = .false.
+     call symtab%free()
+     call orbs%set_stars(.false.)
+     write(msg,'(2a)') ' RDMFT: the active space (free and background orbitals) is not the same at the k-points related by the ',&
+       'symmetry operations: the symmetry reduction is not used (only time reversal).'
+     call wrtout([ab_out,std_out],msg)
+   end if
+ end if
+
  ! ------------------------------------------------------------------
  ! J and K integrals in the active space
  ! ------------------------------------------------------------------
  tst(3) = abi_wtime()-t_start
  call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
-                   dtset%rdmft_core_ints == 1,reduce=(dtset%rdmft_tr_reduce == 1))
+                   dtset%rdmft_core_ints == 1,reduce=(dtset%rdmft_tr_reduce == 1),sym=symtab)
  tst(4) = abi_wtime()-t_start
  call report_mem('after the integrals')
  nf = ints%nfree
@@ -522,6 +574,18 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      call orbital_macro(eopt+e_ewald+e_corepsp)
      tst(6) = abi_wtime()-t_start
      eopt = energy_rot(orbs,h1c)-e_ewald-e_corepsp
+     if (use_sym) then
+       ! Control of the symmetry classes: the energy from the integrals filled by symmetry against the explicit one
+       call sync_h1f()
+       dev_sym = abs(energy_cur()-(eopt+e_ewald+e_corepsp))
+       write(msg,'(a,es10.2,a)') ' RDMFT: energy from the integrals filled by symmetry minus the explicit one = ',dev_sym,' Ha'
+       call wrtout([ab_out,std_out],msg)
+       if (dev_sym > 1.0e-8_dp) then
+         write(msg,'(2a)') ' RDMFT: WARNING: the symmetry classes are not accurate any more (the orbitals lost the symmetry of the',&
+           ' ground state), use rdmft_sym_reduce = 0.'
+         call wrtout([ab_out,std_out],msg)
+       end if
+     end if
      if (is_pnof) call final_pnof_reopt(eopt)
    end if
 
@@ -848,7 +912,7 @@ contains
 
  subroutine rotate_all(kpar,dx)
    ! Rotation of all the k-points with the ADAM step dx: kappa_pq = dx (p<q), kappa_qp = -conjg(kappa_pq), U = exp(kappa);
-   ! the time-reversed k-point -k gets the conjugate matrix
+   ! the other k-points of the star (time-reversed k-point -k, images by the symmetry operations) get U or its conjugate
    integer,intent(in) :: kpar(:)
    complex(dpc),intent(in) :: dx(:)
    integer :: jk,kk,ipar,pp,qq,nb2
@@ -870,8 +934,14 @@ contains
      end do
      um = rdmft_expm(kap)
      call apply_u(jk,um)
-     kk = orbs%tr_k(jk)
-     if (kk > 0 .and. kk /= jk) call apply_u(kk,conjg(um))
+     do kk=1,orbs%nkpt
+       if (kk == jk .or. orbs%star_rep(kk) /= jk) cycle
+       if (orbs%star_conj(kk)) then
+         call apply_u(kk,conjg(um))
+       else
+         call apply_u(kk,um)
+       end if
+     end do
      ABI_FREE(kap)
      ABI_FREE(um)
    end do
@@ -1032,7 +1102,7 @@ contains
    complex(dpc),intent(out) :: grad(:)
    integer :: ib2,iq2,jk,ipar,pp,qq,nb2,nbmax,ncol,nrow
    real(dp) :: fac
-   logical,allocatable :: relev(:)
+   logical,allocatable :: relev(:),rsym(:,:)
    complex(dpc) :: dg
    complex(dpc),allocatable :: fk(:,:),fh(:,:),fchk(:,:)
    real(dp),allocatable :: acf(:,:),ccf(:,:),nux(:)
@@ -1058,6 +1128,22 @@ contains
      ABI_FREE(ccf)
      ABI_FREE(nux)
    end do
+   if (use_sym) then
+     ! the orbitals of a star have the same relevance (the integrals of the images are filled from the representative pair)
+     ABI_MALLOC(rsym,(orbs%nkpt,nbmax))
+     rsym = .false.
+     do jk=1,orbs%nkpt
+       do ib2=1,orbs%nband(jk,1)
+         if (relev(offset(jk)+ib2)) rsym(orbs%ibz_rep(jk),ib2) = .true.
+       end do
+     end do
+     do jk=1,orbs%nkpt
+       do ib2=1,orbs%nband(jk,1)
+         relev(offset(jk)+ib2) = rsym(orbs%ibz_rep(jk),ib2)
+       end do
+     end do
+     ABI_FREE(rsym)
+   end if
    if (nmem_eval < 2) call report_mem('ORB: eval_point after the relevance pass')
    ! The couplings are stored only between relevant bands (rows) and relevant orbitals (columns): the memory does not grow
    ! with the square of the number of orbitals of the complete basis
@@ -1106,7 +1192,7 @@ contains
    rdmft_mem_on = (nmem_eval < 2 .and. dtset%prtvol >= 5)
    call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
                      dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,req=req,rel=relev,&
-                     reduce=(dtset%rdmft_tr_reduce == 1))
+                     reduce=(dtset%rdmft_tr_reduce == 1),sym=symtab)
    tm(1) = tm(1)+abi_wtime()-t0
    rdmft_mem_on = .false.
    nmem_eval = nmem_eval+1
@@ -1148,8 +1234,7 @@ contains
        call wrtout(std_out,msg)
        ABI_FREE(fchk)
      end if
-     fac = one
-     if (orbs%tr_k(jk) > 0 .and. orbs%tr_k(jk) /= jk) fac = two
+     fac = real(count(orbs%star_rep == jk),dp)
      ipar = kpar(jk)
      do pp=1,nb2
        do qq=pp+1,nb2
@@ -1235,8 +1320,7 @@ contains
                          offset,nbk,hmat(1:nb2,1:nb2,k0),nux,acf,ccf,xmpi_world,fa)
    call rdmft_gen_fock_k(orbs,k0,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,&
                          offset,nbk,hmat(1:nb2,1:nb2,k0),nux,acs,ccs,xmpi_world,fs)
-   fac = one
-   if (orbs%tr_k(k0) > 0 .and. orbs%tr_k(k0) /= k0) fac = two
+   fac = real(count(orbs%star_rep == k0),dp)
    gall = zero
    gskip = zero
    gdiff = zero
@@ -1286,8 +1370,8 @@ contains
    ABI_MALLOC(kpar,(orbs%nkpt))
    npar = 0
    do jk=1,orbs%nkpt
-     ! independent k-points: -k is represented by k (time reversal)
-     if (orbs%tr_k(jk) > 0 .and. orbs%tr_k(jk) < jk) then
+     ! independent k-points: the others (-k by time reversal, the images by the operations) are represented by their star
+     if (orbs%star_rep(jk) /= jk) then
        kpar(jk) = -1
      else
        kpar(jk) = npar
@@ -1402,7 +1486,7 @@ contains
      ! all the pairs of orbitals for the optimization of the occupations
      t0 = abi_wtime()
      call ints%compute(orbs,ngfftf,gsqcutf_eff,dtset%icutcoul,dtset%rcut,dtset%fock_icutcoul,dtset%fock_rcut,free,bg,&
-                       dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,reduce=(dtset%rdmft_tr_reduce == 1))
+                       dtset%rdmft_core_ints == 1,quiet=.true.,comm=xmpi_world,reduce=(dtset%rdmft_tr_reduce == 1),sym=symtab)
      tm(7) = tm(7)+abi_wtime()-t0
      if (imac == 1) call report_mem('ORB: macro-iteration 1, full integrals for the occupations')
      call sync_h1f()

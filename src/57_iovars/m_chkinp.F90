@@ -1492,6 +1492,7 @@ subroutine chkinp(dtsets, iout, mpi_enregs, ndtset, ndtset_alloc, npsp, pspheads
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_occ_skip',dt%rdmft_occ_skip,1,zero,iout)
    call chkdpr(0,0,cond_string,cond_values,ierr,'rdmft_occ_min',dt%rdmft_occ_min,1,zero,iout)
    call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_tr_reduce',dt%rdmft_tr_reduce,2,[0,1],iout)
+   call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_sym_reduce',dt%rdmft_sym_reduce,2,[0,1],iout)
    call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_core_ints',dt%rdmft_core_ints,2,[0,1],iout)
    call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_restart',dt%rdmft_restart,2,[0,1],iout)
    call chkint_eq(0,0,cond_string,cond_values,ierr,'rdmft_start',dt%rdmft_start,2,[0,1],iout)
