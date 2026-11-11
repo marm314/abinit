@@ -381,17 +381,17 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
        ! become k-independent) and the table is built again
        nunf = 0
        do isk=1,table%nskip_rec
-         if (table%skip_why(isk) /= 1) cycle
          ip = table%skip_p(isk)
          iq = table%skip_v(isk)
          ik = korb(ip)
          jk = korb(iq)
          if (.not.symtab%generic(ik)) cycle
          if (dtset%rdmft_sym_unfold < zero .or. eigc(iq)-eigc(ip) >= dtset%rdmft_sym_unfold) cycle
-         write(msg,'(a,i0,a,i0,a,f10.6,a,i0,a,i0,a,f10.6,a,f9.5,a)') &
+         write(msg,'(a,i0,a,i0,a,f10.6,a,i0,a,i0,a,f10.6,a,f9.5,3a)') &
            ' RDMFT: WARNING, the star of k-point ',ik,' (principal orbital band ',ip-offset(ik),', E = ',eigc(ip),&
-           ' Ha) cannot be coupled with the k-independent orbital band ',iq-offset(jk),' of k-point ',jk,' (E = ',eigc(iq),&
-           ' Ha, E_v-E_p = ',eigc(iq)-eigc(ip),' Ha < rdmft_sym_unfold).'
+           ' Ha) cannot be coupled with the orbital band ',iq-offset(jk),' of k-point ',jk,' (E = ',eigc(iq),&
+           ' Ha, E_v-E_p = ',eigc(iq)-eigc(ip),' Ha < rdmft_sym_unfold; ',&
+           trim(merge('k-independent virtual unit','no symmetric assignment   ',table%skip_why(isk) == 1)),').'
          call wrtout([ab_out,std_out],msg)
          nfold = 0
          do jk = 1,orbs%nkpt
@@ -414,9 +414,9 @@ subroutine rdmft_driver(codvsn,dtfil,dtset,mpi_enreg,pawrad,pawtab,psps)
      end do
      if (table%nskip > 0) then
        nskip1 = count(table%skip_why(1:table%nskip_rec) == 1)
-       if (nskip1 > 0) then
-         write(msg,'(3a,i0,2a)') ch10,' RDMFT: WARNING, couplings not included in the symmetric table (k-independent virtual ',&
-           'orbital refused to a one-representative principal orbital, E_v-E_p >= rdmft_sym_unfold): ',nskip1,&
+       if (table%nskip > 0) then
+         write(msg,'(3a,i0,2a)') ch10,' RDMFT: WARNING, couplings not included in the symmetric table (virtual units ',&
+           'refused to the principal units, E_v-E_p >= rdmft_sym_unfold or no unfolding): ',table%nskip,&
            ch10,'         the energy may differ from the one with rdmft_sym_reduce 0.'
          call wrtout([ab_out,std_out],msg)
        end if

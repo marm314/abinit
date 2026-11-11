@@ -15,7 +15,7 @@
  For more information, see https://www.abinit.org .
 
 .Starting date : Wed 11 Nov 2026.
-- ( at 12h53 )
+- ( at 13h09 )
   
 - input  file    -> /home/marm314/Installers/abinit/abinit/tests/Test_suite/v10_t86/t86.abi
 - output file    -> t86.abo
@@ -776,7 +776,7 @@ meta: {optdriver: 11, }
  RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
 
 
- RDMFT: WARNING, couplings not included in the symmetric table (k-independent virtual orbital refused to a one-representative principal orbital, E_v-E_p >= rdmft_sym_unfold): 286
+ RDMFT: WARNING, couplings not included in the symmetric table (virtual units refused to the principal units, E_v-E_p >= rdmft_sym_unfold or no unfolding): 492
          the energy may differ from the one with rdmft_sym_reduce 0.
 
  RDMFT: virtual units refused to the principal units of the symmetric table: 492 (286 because the virtual unit is k-independent and the principal one-representative)
@@ -964,7 +964,7 @@ meta: {optdriver: 11, }
  RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
 
 
- RDMFT: WARNING, couplings not included in the symmetric table (k-independent virtual orbital refused to a one-representative principal orbital, E_v-E_p >= rdmft_sym_unfold): 39
+ RDMFT: WARNING, couplings not included in the symmetric table (virtual units refused to the principal units, E_v-E_p >= rdmft_sym_unfold or no unfolding): 50
          the energy may differ from the one with rdmft_sym_reduce 0.
 
  RDMFT: virtual units refused to the principal units of the symmetric table: 50 (39 because the virtual unit is k-independent and the principal one-representative)
@@ -1352,7 +1352,7 @@ meta: {optdriver: 11, }
  RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
 
 
- RDMFT: WARNING, couplings not included in the symmetric table (k-independent virtual orbital refused to a one-representative principal orbital, E_v-E_p >= rdmft_sym_unfold): 39
+ RDMFT: WARNING, couplings not included in the symmetric table (virtual units refused to the principal units, E_v-E_p >= rdmft_sym_unfold or no unfolding): 50
          the energy may differ from the one with rdmft_sym_reduce 0.
 
  RDMFT: virtual units refused to the principal units of the symmetric table: 50 (39 because the virtual unit is k-independent and the principal one-representative)
@@ -1739,30 +1739,33 @@ meta: {optdriver: 11, }
 
  RDMFT: one-electron part (kinetic + local and nonlocal pseudopotential) computed with getghc.
 
- RDMFT: WARNING, the star of k-point 23 (principal orbital band 5, E =  -0.159470 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.23326 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 23 (principal orbital band 5, E =  -0.159470 Ha) cannot be coupled with the orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.23326 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (4 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 7 (principal orbital band 5, E =  -0.160630 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.23442 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 7 (principal orbital band 5, E =  -0.160630 Ha) cannot be coupled with the orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.23442 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (4 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 27 (principal orbital band 5, E =  -0.166598 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.24039 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 27 (principal orbital band 5, E =  -0.166598 Ha) cannot be coupled with the orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.24039 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (4 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 6 (principal orbital band 5, E =  -0.184305 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.25810 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 6 (principal orbital band 5, E =  -0.184305 Ha) cannot be coupled with the orbital band 6 of k-point 1 (E =   0.073795 Ha, E_v-E_p =   0.25810 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (8 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 10 (principal orbital band 5, E =  -0.192268 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.27512 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 10 (principal orbital band 5, E =  -0.192268 Ha) cannot be coupled with the orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.27512 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (4 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 22 (principal orbital band 5, E =  -0.193860 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.27671 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 22 (principal orbital band 5, E =  -0.193860 Ha) cannot be coupled with the orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.27671 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (8 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 26 (principal orbital band 5, E =  -0.197801 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.28065 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 26 (principal orbital band 5, E =  -0.197801 Ha) cannot be coupled with the orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.28065 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (8 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 21 (principal orbital band 5, E =  -0.215428 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.29828 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 21 (principal orbital band 5, E =  -0.215428 Ha) cannot be coupled with the orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.29828 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (4 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 25 (principal orbital band 5, E =  -0.219177 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.30203 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 25 (principal orbital band 5, E =  -0.219177 Ha) cannot be coupled with the orbital band 6 of k-point 43 (E =   0.082854 Ha, E_v-E_p =   0.30203 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (4 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 5 (principal orbital band 5, E =  -0.238989 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 42 (E =   0.110894 Ha, E_v-E_p =   0.34988 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 5 (principal orbital band 5, E =  -0.238989 Ha) cannot be coupled with the orbital band 6 of k-point 42 (E =   0.110894 Ha, E_v-E_p =   0.34988 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (4 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
- RDMFT: WARNING, the star of k-point 9 (principal orbital band 5, E =  -0.241162 Ha) cannot be coupled with the k-independent orbital band 6 of k-point 42 (E =   0.110894 Ha, E_v-E_p =   0.35206 Ha < rdmft_sym_unfold).
+ RDMFT: WARNING, the star of k-point 9 (principal orbital band 5, E =  -0.241162 Ha) cannot be coupled with the orbital band 6 of k-point 42 (E =   0.110894 Ha, E_v-E_p =   0.35206 Ha < rdmft_sym_unfold; k-independent virtual unit).
           The star (2 k-points) is UNFOLDED: its k-points become k-independent and lose the symmetry reduction, so that the coupling is included as in the full BZ.
  RDMFT: after the unfolding, one-representative k-points: 2 of 64; the table of subspaces is built again.
 
+
+ RDMFT: WARNING, couplings not included in the symmetric table (virtual units refused to the principal units, E_v-E_p >= rdmft_sym_unfold or no unfolding): 59
+         the energy may differ from the one with rdmft_sym_reduce 0.
 
  RDMFT: virtual units refused to the principal units of the symmetric table: 59 (0 because the virtual unit is k-independent and the principal one-representative)
 
@@ -2608,10 +2611,10 @@ P           mkmem          18
 - The licence allows the authors to put it on the Web.
 - DOI and bibtex: see https://docs.abinit.org/theory/bibliography/#gonze2016
 -
-- Proc.   0 individual time (sec): cpu=         26.4  wall=         17.8
+- Proc.   0 individual time (sec): cpu=         30.2  wall=         21.5
 
 ================================================================================
 
  Calculation completed.
-.Delivered  27 WARNINGs and  24 COMMENTs to log file.
-+Overall time at end (sec) : cpu=         26.4  wall=         17.8
+.Delivered  28 WARNINGs and  24 COMMENTs to log file.
++Overall time at end (sec) : cpu=         30.2  wall=         21.5
